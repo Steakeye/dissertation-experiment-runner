@@ -4,6 +4,7 @@
   "description": "NodeJS CLI for running the experiments through experiment server",
   "main": "bin/index.js",
   "scripts": {
+    "start": "node bin/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -13,9 +14,10 @@
   "author": "Andrew Keats",
   "license": "ISC",
   "devDependencies": {
+    "@types/inquirer": "0.0.42",
+    "@types/minimist": "^1.2.0",
     "@types/node": "^10.3.4",
-    "typescript": "^2.9.2",
-    "vorpal-typeScript-typings": "file:../../../../../Downloads/eb9662260c3ed29dd85b226a081c96ca-60a6e0ba25c68f804a8eb66361c30d5d28193acc"
+    "typescript": "^2.9.2"
   },
   "dependencies": {
     "vorpal": "^1.12.0"

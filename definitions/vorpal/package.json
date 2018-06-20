@@ -1,0 +1,5 @@
+{
+  "name": "vorpal-typeScript-typings",
+  "version": "0.1.0",
+  "typings": "./vorpal.d.ts"
+}
