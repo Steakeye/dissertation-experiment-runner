@@ -1,18 +1,15 @@
 /// <reference path="../definitions/vorpal/vorpal.d.ts" />
 
 import Vorpal from 'vorpal';
-//import VorpalType from 'vorpal-typeScript-typings';
-//import * as Vorpal from 'vorpal-typeScript-typings';
+
+import { exp_run as server } from "./server-api";
+import { exp_run as user } from "./user-api";
 
 const vorpal = new Vorpal();
 
-vorpal
-    .command('foo', 'Outputs "bar".')
-    .action(function(args, callback) {
-        this.log('bar');
-        callback();
-    });
+const serverAPI = new server.ServerApi(vorpal);
+const userAPI = new user.UserApi(vorpal);
 
 vorpal
-    .delimiter('myapp$')
+    .delimiter('exp-run$')
     .show();
