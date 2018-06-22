@@ -1,7 +1,7 @@
 import Vorpal from "vorpal";
 import range from "lodash/range";
 import Chance from "chance";
-import { create as RandomSeedCtor, RandomSeed } from "random-seed";
+import {isEmail, isURL} from "validator";
 import {API} from "../definitions/exp-run";
 
 export module exp_run {
@@ -44,9 +44,22 @@ export module exp_run {
 
             this.vorpalInstance
                 .command(UserApi.COMMAND_NAME_SET_USER, UserApi.COMMAND_DESC_SET_USER)
+                .validate(function (args) {
+                    const email: string | null = <string>args.email || null;
+
+                    let result: string | true;
+
+                    if (email === null || isEmail(<string>email)) {
+                        result = true;
+                    } else {
+                        result = UserApi.VALID_FAIL_DESC_SET_USER;
+                    }
+
+                    return result;
+                })
                 .action(function(args, callback) {
                     const emailAddress: string = <string>args.email;
-                    const message: string = emailAddress ? `${UserApi.ACTION_DESC_SET_USER}${emailAddress}`: UserApi.ACTION_DESC_SET_USER_EMPTY
+                    const message: string = emailAddress ? `${UserApi.ACTION_DESC_SET_USER}${emailAddress}`: UserApi.ACTION_DESC_SET_USER_EMPTY;
 
                     this.log(message);
 
@@ -96,6 +109,7 @@ export module exp_run {
 
         private static readonly COMMAND_NAME_SET_USER: string = "set-user [email]";
         private static readonly COMMAND_DESC_SET_USER: string = "Sets the user email address. Passing no value unsets the user email address.";
+        private static readonly VALID_FAIL_DESC_SET_USER: string = "Cannot set user email address to invalid user email address";
         private static readonly ACTION_DESC_SET_USER: string = "Setting user email address to: ";
         private static readonly ACTION_DESC_SET_USER_EMPTY: string = "Unsetting user email address";
 

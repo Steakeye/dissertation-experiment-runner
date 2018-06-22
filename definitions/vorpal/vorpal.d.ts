@@ -5,11 +5,21 @@
 
 /// <reference types="inquirer" />
 /// <reference types="minimist" />
+
 declare module "vorpal" {
 
     import {ParsedArgs} from 'minimist';
     import {EventEmitter} from 'events';
     import {Inquirer} from "inquirer";
+
+    interface LocalStorage {
+        (id: string): Vorpal;
+        getItem(key: string, value?:any): any;
+        removeItem(key: string): void;
+        setId(id: string): void;
+        setItem(key: string, value?:any): void;
+        validate(): void;
+    }
 
     class Vorpal extends EventEmitter {
 // class Session{};
@@ -151,7 +161,8 @@ declare module "vorpal" {
          * @return {this}
          * @api public
          */
-        localStorage(id: string): this;
+        //localStorage (id: string): this;
+        localStorage: LocalStorage;
 
         /**
          * Set the path to where command line history is persisted.
@@ -373,7 +384,7 @@ declare module "vorpal" {
         export interface Args{
             options: Options,
             //[name:string] : string | object;
-            [name:string] : Options | string | number;
+            [name:string] : Options | string | number | any[];
         }
         export interface CommandInstance {
             log(message?: any, ...optionalParams: any[]):void;

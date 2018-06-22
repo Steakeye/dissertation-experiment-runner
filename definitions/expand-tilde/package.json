@@ -1,0 +1,5 @@
+{
+  "name": "expand-tilde-typeScript-typings",
+  "version": "0.1.0",
+  "typings": "./expand-tilde.d.ts"
+}
