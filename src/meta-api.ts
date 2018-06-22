@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import every from "lodash/every";
 import isNum from "lodash/isNumber";
@@ -6,12 +7,14 @@ import fsExtra from "fs-extra";
 import expandTilde from "expand-tilde";
 import path from "path";
 import {API} from "../definitions/exp-run";
+import {ExpEvents} from "./exp-events";
 
 export module exp_run {
 
     export class MetaApi implements API {
 
-        constructor(private vorpalInstance: Vorpal) {
+        constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
+            this.configureEventListeners();
             this.revivePreviousRange();
             this.revivePreviousSaveDir();
             this.setupRangeGetter();
@@ -171,6 +174,15 @@ export module exp_run {
             const dir: string | null = this.vorpalInstance.localStorage.getItem(MetaApi.STORAGE_KEY_SAVE_DIR);
 
             this.saveDir = dir !== null ? <string>dir : "";
+        }
+
+        private configureEventListeners(): void {
+            this.publishDirValue = this.publishDirValue.bind(this);
+            this.pubSub.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
+        }
+
+        private publishDirValue(cb: (dir: string) => void): void {
+            cb(this.saveDir);
         }
 
         private static readonly COMMAND_NAME_GET_RANGE: string = "get-range";

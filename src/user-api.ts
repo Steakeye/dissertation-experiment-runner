@@ -1,14 +1,16 @@
+import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import range from "lodash/range";
 import Chance from "chance";
-import {isEmail, isURL} from "validator";
+import {isEmail} from "validator";
 import {API} from "../definitions/exp-run";
+import {ExpEvents} from "./exp-events";
 
 export module exp_run {
 
     export class UserApi implements API {
 
-        constructor(private vorpalInstance: Vorpal) {
+        constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
             this.setupUserGetter();
             this.setupUserSetter();
             this.setupUserNumbersGetter();
@@ -89,6 +91,52 @@ export module exp_run {
                 });
         }
 
+        private setupSaveUserDetails() {
+            const userEmailGetter = () => {
+                return this.userEmail;
+            };
+            const userNumGetter = () => {
+                return this.userNumbers;
+            };
+
+            const pb: EventEmitter = this.pubSub;
+
+            let sentDir: string | null = null;
+
+            this.vorpalInstance
+                .command(UserApi.COMMAND_NAME_SAVE_CURRENT_USER, UserApi.COMMAND_DESC_SAVE_CURRENT_USER)
+                .validate(function(args) {
+                    pb.emit(ExpEvents.REQUEST_DIR, (dir: string) => {
+                        sentDir = dir;
+                    });
+
+                    const email: string = userEmailGetter();
+                    const userNums: number[] = userNumGetter();
+                    const hasEmail: boolean = !!email.length;
+                    const hasUserNums: boolean = !!userNums.length;
+
+                    let result: string | true;
+
+                    if (!sentDir) {
+                        result = UserApi.VALID_FAIL_DESC_SAVE_CURRENT_USER_DIR;
+                    } else if (hasEmail && hasUserNums) {
+                        result = true;
+                    } else {
+                        result = UserApi.VALID_FAIL_DESC_SAVE_CURRENT_USER_EMPTY;
+                    }
+
+                    return <string | true>result;
+                })
+                .action(function(args, callback) {
+                    const filePath: string = `${sentDir}${sentDir}.json`;
+                    const message: string = `${UserApi.ACTION_DESC_SAVE_CURRENT_USER}${filePath}`;
+
+                    this.log(message);
+
+                    callback();
+                });
+        }
+
         private updateUserNumbers(emailAddress: string): void {
             const userNums: number[] = this.userNumbers;
 
@@ -117,6 +165,12 @@ export module exp_run {
         private static readonly COMMAND_DESC_GET_USER_ORDER: string = "Gets the user's experiment order";
         private static readonly ACTION_DESC_GET_USER_ORDER: string = "User's experiment order is: ";
         private static readonly ACTION_DESC_GET_USER_ORDER_NOT_SET: string = "User's experiment order not set (probably as there is no user email).";
+
+        private static readonly COMMAND_NAME_SAVE_CURRENT_USER: string = "save-user-details";
+        private static readonly COMMAND_DESC_SAVE_CURRENT_USER: string = "Saves the current user details to the experiment save directory.";
+        private static readonly VALID_FAIL_DESC_SAVE_CURRENT_USER_DIR: string = "Cannot save user details to non-existant folder";
+        private static readonly VALID_FAIL_DESC_SAVE_CURRENT_USER_EMPTY: string = "Cannot save non-existant user details";
+        private static readonly ACTION_DESC_SAVE_CURRENT_USER: string = "Saving current user details to: ";
 
         private userEmail: string = "";
         private userNumbers: number[] = [];

@@ -1,5 +1,4 @@
-/// <reference path="../definitions/curl/curl.d.ts" />
-
+import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
 import range from "lodash/range";
@@ -10,7 +9,7 @@ export module exp_run {
 
     export class ServerApi implements API {
 
-        constructor(private vorpalInstance: Vorpal) {
+        constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
             this.setupServerGetter();
             this.setupServerSetter();
             this.setupServerRedirectGetter();
