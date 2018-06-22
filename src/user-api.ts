@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import range from "lodash/range";
+import fsExtra from "fs-extra";
 import Chance from "chance";
 import {isEmail} from "validator";
 import {API} from "../definitions/exp-run";
@@ -14,6 +15,7 @@ export module exp_run {
             this.setupUserGetter();
             this.setupUserSetter();
             this.setupUserNumbersGetter();
+            this.setupSaveUserDetails();
         }
 
         public get emailAddress(): string { return this.userEmail; }
@@ -128,10 +130,12 @@ export module exp_run {
                     return <string | true>result;
                 })
                 .action(function(args, callback) {
-                    const filePath: string = `${sentDir}${sentDir}.json`;
+                    const filePath: string = `${sentDir}/${userEmailGetter()}.json`;
                     const message: string = `${UserApi.ACTION_DESC_SAVE_CURRENT_USER}${filePath}`;
 
                     this.log(message);
+
+                    fsExtra.writeJSONSync(filePath, { email: userEmailGetter(), "exp_order": userNumGetter() })
 
                     callback();
                 });
