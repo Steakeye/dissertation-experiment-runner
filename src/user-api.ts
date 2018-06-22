@@ -95,7 +95,7 @@ export module exp_run {
         private static readonly ACTION_DESC_GET_USER_NOT_SET: string = "User email address not set!";
 
         private static readonly COMMAND_NAME_SET_USER: string = "set-user [email]";
-        private static readonly COMMAND_DESC_SET_USER: string = "Sets the user email address. Passing no values unsets the user email address.";
+        private static readonly COMMAND_DESC_SET_USER: string = "Sets the user email address. Passing no value unsets the user email address.";
         private static readonly ACTION_DESC_SET_USER: string = "Setting user email address to: ";
         private static readonly ACTION_DESC_SET_USER_EMPTY: string = "Unsetting user email address";
 

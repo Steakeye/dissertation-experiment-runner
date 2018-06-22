@@ -364,11 +364,16 @@ declare module "vorpal" {
             action<T>(actionFn: CommandActionFn<T>): this;
         }
 
+        //Options
+
+        export interface Options {
+            [name:string] : string;
+        }
+
         export interface Args{
-            options: {
-                [name:string] : string;
-            },
-            [name:string] : string | object;
+            options: Options,
+            //[name:string] : string | object;
+            [name:string] : Options | string | number;
         }
         export interface CommandInstance {
             log(message?: any, ...optionalParams: any[]):void;
