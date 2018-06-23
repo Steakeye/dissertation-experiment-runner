@@ -22,4 +22,5 @@ const metaAPI = new meta.MetaApi(vorpal, evtEmitter);
 vorpal
     .delimiter(`${cliName}$`)
     .show()
+    .log("Welcome to the test experiment runner! Type 'help' for a list of instructions to type into the console.")
     .parse(process.argv);

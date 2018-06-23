@@ -6,12 +6,14 @@ import Chance from "chance";
 import {isEmail} from "validator";
 import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
+import {MetaApi} from "./meta-api";
 
 export module exp_run {
 
     export class UserApi implements API {
 
         constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
+            this.revivePreviousUser();
             this.setupUserGetter();
             this.setupUserSetter();
             this.setupUserNumbersGetter();
@@ -41,6 +43,7 @@ export module exp_run {
         private setupUserSetter() {
             const userSetter = (emailAddress: string) => {
                 this.userEmail = emailAddress;
+                this.cacheCurrentUser();
             };
             const userNumbersWrapper = (emailAddress: string) => {
                 this.updateUserNumbers(emailAddress);
@@ -147,12 +150,43 @@ export module exp_run {
             userNums.length = 0;
 
             if (emailAddress) {
-                const orderOptions: number[] = range(2, 9);
-                const randomOrderGen: Chance.Chance = Chance.Chance(emailAddress);
+                //const orderOptions: number[] = range(2, 9);
+                const orderOptions: number[] | null = this.fetchExperimentRange();
 
-                userNums.push(1, ...randomOrderGen.pickset(orderOptions, orderOptions.length));
+                if (orderOptions) {
+                    const randomOrderGen: Chance.Chance = Chance.Chance(emailAddress);
+                    userNums.push(1, ...randomOrderGen.pickset(orderOptions, orderOptions.length));
+                } else {
+                    this.vorpalInstance.log(UserApi.ACTION_DESC_SET_USER_NUMBERS_FAIL)
+                }
             }
         }
+
+        private cacheCurrentUser(): void {
+            this.vorpalInstance.localStorage.setItem(UserApi.STORAGE_KEY_CURRENT_USER, this.userEmail);
+        }
+
+        private revivePreviousUser(): void {
+            const user: string | null = this.vorpalInstance.localStorage.getItem(UserApi.STORAGE_KEY_CURRENT_USER);
+
+            this.userEmail = user || "";
+
+            if (user) {
+                this.updateUserNumbers(user)
+            }
+        }
+
+        private fetchExperimentRange(): number[] | null {
+            let expRange: number[] | null = null;
+
+            this.pubSub.emit(ExpEvents.REQUEST_RANGE, (range: number[]) => {
+                expRange = range;
+            });
+
+            return expRange;
+        }
+
+        private static readonly STORAGE_KEY_CURRENT_USER: string = "current-user";
 
         private static readonly COMMAND_NAME_GET_USER: string = "get-user";
         private static readonly COMMAND_DESC_GET_USER: string = "Gets the current user email";
@@ -164,6 +198,7 @@ export module exp_run {
         private static readonly VALID_FAIL_DESC_SET_USER: string = "Cannot set user email address to invalid user email address";
         private static readonly ACTION_DESC_SET_USER: string = "Setting user email address to: ";
         private static readonly ACTION_DESC_SET_USER_EMPTY: string = "Unsetting user email address";
+        private static readonly ACTION_DESC_SET_USER_NUMBERS_FAIL: string = "Could not generate user experment order because experiment range has not been set";
 
         private static readonly COMMAND_NAME_GET_USER_ORDER: string = "get-user-order";
         private static readonly COMMAND_DESC_GET_USER_ORDER: string = "Gets the user's experiment order";

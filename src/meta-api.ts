@@ -96,6 +96,7 @@ export module exp_run {
 
             this.vorpalInstance
                 .command(MetaApi.COMMAND_NAME_GET_SAVE_DIR, MetaApi.COMMAND_DESC_GET_SAVE_DIR)
+                .option(MetaApi.COMMAND_FLAG_SAVE_DIR_USER, MetaApi.COMMAND_FLAG_DESC_SAVE_DIR_USER)
                 .action(function(args, callback) {
                     const dir: string = dirGetter();
                     const hasDir: boolean = !!dir.length;
@@ -208,6 +209,10 @@ export module exp_run {
         private static readonly VALID_FAIL_DESC_SET_SAVE_DIR: string = "Cannot set the save directory to non-existant folder";
         private static readonly ACTION_DESC_SET_SAVE_DIR: string = "Setting experiment save directory to: ";
         private static readonly ACTION_DESC_SET_SAVE_DIR_EMPTY: string = "Unsetting experiment save directory";
+
+        private static readonly COMMAND_FLAG_SAVE_DIR_USER: string = "-u, --user-data";
+        private static readonly COMMAND_FLAG_DESC_SAVE_DIR_USER: string = "Specifies the save-directory to be used for user data.";
+
 
         private expRange: number[] = [];
         private saveDir: string = "";

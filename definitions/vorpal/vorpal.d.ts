@@ -352,7 +352,7 @@ declare module "vorpal" {
 
             parse(parseFn: CommandParseFn): this;
 
-            option(flag: string, description: string, autocomplete: string[]): this; // TODO: Check autocomplete types.
+            option(flag: string, description: string, autocomplete?: string[]): this; // TODO: Check autocomplete types.
             types(types: TypesDefinition): this;
 
             hidden(): this; // TODO: Check return type.
