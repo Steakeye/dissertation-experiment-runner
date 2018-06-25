@@ -24,8 +24,8 @@ vorpal
     .log("Welcome to the test experiment runner! Type 'help' for a list of instructions to type into the console.");
     //.parse(process.argv);
 
+const metaAPI = new meta.MetaApi(vorpal);
 const serverAPI = new server.ServerApi(vorpal);
 const userAPI = new user.UserApi(vorpal);
-const metaAPI = new meta.MetaApi(vorpal);
 
 vorpal.parse(process.argv)

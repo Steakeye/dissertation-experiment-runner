@@ -6,16 +6,13 @@ import Chance from "chance";
 import {isEmail} from "validator";
 import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
+import {exp_run as MetaApi} from "./meta-api";
 import {vorpal_appdata} from "./plugins/vorpal-appdata";
 
 export module exp_run {
 
     import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
-
-    interface RangeTuple {
-        0: number[],
-        1:boolean
-    }
+    import RangeTuple = MetaApi.RangeTuple;
 
     export class UserApi implements API {
 
@@ -95,9 +92,7 @@ export module exp_run {
                 .action(function(args, callback) {
                     const userNums: number[] = userNumGetter();
                     const hasUserNums: boolean = !!userNums.length;
-                    /*const message: string = hasUserNums ? `${UserApi.ACTION_DESC_GET_USER_ORDER}${userNums}` : UserApi.ACTION_DESC_GET_USER_ORDER_NOT_SET;
 
-                    this.log(message);*/
                     if (hasUserNums) {
                         this.log(`${UserApi.ACTION_DESC_GET_USER_ORDER}${userNums}`);
                     } else {
@@ -162,7 +157,6 @@ export module exp_run {
             userNums.length = 0;
 
             if (emailAddress) {
-                //const orderOptions: number[] = range(2, 9);
                 const orderOptions: RangeTuple | null = this.fetchExperimentRange();
 
                 if (orderOptions) {
@@ -187,7 +181,7 @@ export module exp_run {
         }
 
         private revivePreviousUser(): void {
-            const getUserCB = (err: any, val: any) => {
+            const getUserCB = (val: any) => {
                 const user: string | null =  val;
 
                 this.userEmail = user || "";
@@ -197,7 +191,7 @@ export module exp_run {
                 }
             };
 
-            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(UserApi.STORAGE_KEY_CURRENT_USER, getUserCB);
+            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(UserApi.STORAGE_KEY_CURRENT_USER).then(getUserCB);
         }
 
         private fetchExperimentRange(): RangeTuple | null {
@@ -216,7 +210,6 @@ export module exp_run {
                 retVal = null;
             }
 
-            //return expRange;
             return retVal;
         }
 
@@ -247,6 +240,5 @@ export module exp_run {
 
         private userEmail: string = "";
         private userNumbers: number[] = [];
-        //private randomNumGen: Chance.Chance = Chance.Chance();
     }
 }

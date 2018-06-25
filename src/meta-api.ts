@@ -14,6 +14,11 @@ export module exp_run {
 
     import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
 
+    export interface RangeTuple {
+        0: number[],
+        1:boolean
+    }
+
     export class MetaApi implements API {
 
         constructor(private vorpalInstance: Vorpal) {
@@ -48,12 +53,14 @@ export module exp_run {
         }
 
         private setupRangeSetter() {
-            const rangeSetter = (range: number[]) => {
+            const rangeSetter = (range: number[], keepFirstPos: boolean = false) => {
                 const rangeNums: number[] = this.expRange;
 
                 rangeNums.length = 0;
 
                 rangeNums.push(...range);
+
+                this.rangeFixedFirstPos = keepFirstPos;
             };
             const rangeNumbersWrapper = () => {
                 this.updateRangeNumbers();
@@ -61,6 +68,7 @@ export module exp_run {
 
             this.vorpalInstance
                 .command(MetaApi.COMMAND_NAME_SET_RANGE, MetaApi.COMMAND_DESC_SET_RANGE)
+                .option(MetaApi.OPTION_FLAG_SET_RANGE_KEEP_FIRST_POS, MetaApi.OPTION_DESC_SET_RANGE_KEEP_FIRST_POS)
                 .validate(function (args) {
                     const nums: number[] | null = <number[]>args.numbers || null;
 
@@ -99,7 +107,7 @@ export module exp_run {
 
             this.vorpalInstance
                 .command(MetaApi.COMMAND_NAME_GET_SAVE_DIR, MetaApi.COMMAND_DESC_GET_SAVE_DIR)
-                .option(MetaApi.COMMAND_FLAG_SAVE_DIR_USER, MetaApi.COMMAND_FLAG_DESC_SAVE_DIR_USER)
+                .option(MetaApi.OPTION_FLAG_SAVE_DIR_USER, MetaApi.OPTION_DESC_SAVE_DIR_USER)
                 .action(function(args, callback) {
                     const dir: string = dirGetter();
                     const hasDir: boolean = !!dir.length;
@@ -158,20 +166,20 @@ export module exp_run {
         }
 
         private updateRangeNumbers(): void {
-            (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_RANGE, JSON.stringify(this.expRange));
+            (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_RANGE, [this.expRange, this.rangeFixedFirstPos]);
         }
 
         private revivePreviousRange(): void {
-            const getRangeCB = (err: any, val: any) => {
-                const range: number[] | null =  val;
+            const getRangeCB = (val: string) => {
+                const rangeData: RangeTuple | undefined =  val && JSON.parse(val);
 
-                if (range !== null) {
-                    this.expRange.push(...range);
+                if (rangeData) {
+                    this.expRange.push(...rangeData[0]);
+                    this.rangeFixedFirstPos = rangeData[1];
                 }
             };
 
-            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_RANGE, getRangeCB);
-
+           (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_RANGE).then(getRangeCB);
         }
 
         private updateSaveDir(): void {
@@ -179,12 +187,12 @@ export module exp_run {
         }
 
         private revivePreviousSaveDir(): void {
-            const saveDirCB = (err: any, val: any) => {
+            const saveDirCB = (val: any) => {
                 const dir: string | null = val;
                 this.saveDir = dir !== null ? <string>dir : "";
             };
 
-            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_SAVE_DIR, saveDirCB);
+            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_SAVE_DIR).then(saveDirCB);
         }
 
         private configureEventListeners(): void {
@@ -193,7 +201,7 @@ export module exp_run {
             this.publishRangeValue = this.publishRangeValue.bind(this);
 
             vI.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
-            vI.on(ExpEvents.REQUEST_RANGE, this.publishDirValue);
+            vI.on(ExpEvents.REQUEST_RANGE, this.publishRangeValue);
         }
 
         private publishDirValue(cb: (dir: string) => void): void {
@@ -201,7 +209,7 @@ export module exp_run {
         }
 
         private publishRangeValue(cb: (range: number[], fixedFirstPosition: boolean) => void): void {
-            cb(this.range, this.rangeFixedFirstPos);
+            cb(this.expRange, this.rangeFixedFirstPos);
         }
 
         private static readonly COMMAND_NAME_GET_RANGE: string = "get-range";
@@ -212,6 +220,8 @@ export module exp_run {
         private static readonly COMMAND_NAME_SET_RANGE: string = "set-range [numbers...]";
         private static readonly COMMAND_DESC_SET_RANGE: string = "Sets the experiment range. Passing no values unsets the range.";
         private static readonly STORAGE_KEY_RANGE: string = "range";
+        private static readonly OPTION_FLAG_SET_RANGE_KEEP_FIRST_POS: string = "--keep-first, -k";
+        private static readonly OPTION_DESC_SET_RANGE_KEEP_FIRST_POS: string = "Determines whether the range is expected to always have the first value fixed";
         private static readonly VALID_FAIL_DESC_SET_RANGE: string = "Cannot set the experiment range as values must be unique numbers";
         private static readonly ACTION_DESC_SET_RANGE: string = "Setting experiment range to: ";
         private static readonly ACTION_DESC_SET_RANGE_EMPTY: string = "Unsetting experiment range";
@@ -228,8 +238,8 @@ export module exp_run {
         private static readonly ACTION_DESC_SET_SAVE_DIR: string = "Setting experiment save directory to: ";
         private static readonly ACTION_DESC_SET_SAVE_DIR_EMPTY: string = "Unsetting experiment save directory";
 
-        private static readonly COMMAND_FLAG_SAVE_DIR_USER: string = "-u, --user-data";
-        private static readonly COMMAND_FLAG_DESC_SAVE_DIR_USER: string = "Specifies the save-directory to be used for user data.";
+        private static readonly OPTION_FLAG_SAVE_DIR_USER: string = "--user-data, -u";
+        private static readonly OPTION_DESC_SAVE_DIR_USER: string = "Specifies the save-directory to be used for user data.";
 
 
         private expRange: number[] = [];
