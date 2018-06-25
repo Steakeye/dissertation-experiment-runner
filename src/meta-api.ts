@@ -8,8 +8,11 @@ import expandTilde from "expand-tilde";
 import path from "path";
 import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
+import {vorpal_appdata} from "./plugins/vorpal-appdata";
 
 export module exp_run {
+
+    import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
 
     export class MetaApi implements API {
 
@@ -155,35 +158,50 @@ export module exp_run {
         }
 
         private updateRangeNumbers(): void {
-            this.vorpalInstance.localStorage.setItem(MetaApi.STORAGE_KEY_RANGE, JSON.stringify(this.expRange));
+            (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_RANGE, JSON.stringify(this.expRange));
         }
 
         private revivePreviousRange(): void {
-            const range: number[] | null = JSON.parse(this.vorpalInstance.localStorage.getItem(MetaApi.STORAGE_KEY_RANGE));
+            const getRangeCB = (err: any, val: any) => {
+                const range: number[] | null =  val;
 
-            if (range !== null) {
-                this.expRange.push(...range);
-            }
+                if (range !== null) {
+                    this.expRange.push(...range);
+                }
+            };
+
+            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_RANGE, getRangeCB);
 
         }
 
         private updateSaveDir(): void {
-            this.vorpalInstance.localStorage.setItem(MetaApi.STORAGE_KEY_SAVE_DIR, this.saveDir);
+            (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_SAVE_DIR, this.saveDir);
         }
 
         private revivePreviousSaveDir(): void {
-            const dir: string | null = this.vorpalInstance.localStorage.getItem(MetaApi.STORAGE_KEY_SAVE_DIR);
+            const saveDirCB = (err: any, val: any) => {
+                const dir: string | null = val;
+                this.saveDir = dir !== null ? <string>dir : "";
+            };
 
-            this.saveDir = dir !== null ? <string>dir : "";
+            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_SAVE_DIR, saveDirCB);
         }
 
         private configureEventListeners(): void {
+            const vI = this.vorpalInstance;
             this.publishDirValue = this.publishDirValue.bind(this);
-            this.vorpalInstance.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
+            this.publishRangeValue = this.publishRangeValue.bind(this);
+
+            vI.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
+            vI.on(ExpEvents.REQUEST_RANGE, this.publishDirValue);
         }
 
         private publishDirValue(cb: (dir: string) => void): void {
             cb(this.saveDir);
+        }
+
+        private publishRangeValue(cb: (range: number[], fixedFirstPosition: boolean) => void): void {
+            cb(this.range, this.rangeFixedFirstPos);
         }
 
         private static readonly COMMAND_NAME_GET_RANGE: string = "get-range";
@@ -215,6 +233,7 @@ export module exp_run {
 
 
         private expRange: number[] = [];
+        private rangeFixedFirstPos: boolean = false;
         private saveDir: string = "";
     }
 }

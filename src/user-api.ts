@@ -1,13 +1,21 @@
 import EventEmitter from 'events';
-import Vorpal from "vorpal";
+import Vorpal, {CommandInstance} from "vorpal";
 import range from "lodash/range";
 import fsExtra from "fs-extra";
 import Chance from "chance";
 import {isEmail} from "validator";
 import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
+import {vorpal_appdata} from "./plugins/vorpal-appdata";
 
 export module exp_run {
+
+    import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
+
+    interface RangeTuple {
+        0: number[],
+        1:boolean
+    }
 
     export class UserApi implements API {
 
@@ -87,9 +95,14 @@ export module exp_run {
                 .action(function(args, callback) {
                     const userNums: number[] = userNumGetter();
                     const hasUserNums: boolean = !!userNums.length;
-                    const message: string = hasUserNums ? `${UserApi.ACTION_DESC_GET_USER_ORDER}${userNums}` : UserApi.ACTION_DESC_GET_USER_ORDER_NOT_SET;
+                    /*const message: string = hasUserNums ? `${UserApi.ACTION_DESC_GET_USER_ORDER}${userNums}` : UserApi.ACTION_DESC_GET_USER_ORDER_NOT_SET;
 
-                    this.log(message);
+                    this.log(message);*/
+                    if (hasUserNums) {
+                        this.log(`${UserApi.ACTION_DESC_GET_USER_ORDER}${userNums}`);
+                    } else {
+                        (<CommandInstance & { warn(msg: string): void }>this).warn(UserApi.ACTION_DESC_GET_USER_ORDER_NOT_SET);
+                    }
 
                     callback();
                 });
@@ -150,11 +163,19 @@ export module exp_run {
 
             if (emailAddress) {
                 //const orderOptions: number[] = range(2, 9);
-                const orderOptions: number[] | null = this.fetchExperimentRange();
+                const orderOptions: RangeTuple | null = this.fetchExperimentRange();
 
                 if (orderOptions) {
+                    const nums = orderOptions[0];
                     const randomOrderGen: Chance.Chance = Chance.Chance(emailAddress);
-                    userNums.push(1, ...randomOrderGen.pickset(orderOptions, orderOptions.length));
+
+                    if (orderOptions[1]) {
+                        const firstVal: number = nums[0];
+                        const nums2Onwards = nums.slice(1);
+                        userNums.push(firstVal, ...randomOrderGen.pickset(nums2Onwards, nums2Onwards.length));
+                    } else {
+                        userNums.push(...randomOrderGen.pickset(nums, nums.length));
+                    }
                 } else {
                     this.vorpalInstance.log(UserApi.ACTION_DESC_SET_USER_NUMBERS_FAIL)
                 }
@@ -162,27 +183,41 @@ export module exp_run {
         }
 
         private cacheCurrentUser(): void {
-            this.vorpalInstance.localStorage.setItem(UserApi.STORAGE_KEY_CURRENT_USER, this.userEmail);
+            (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(UserApi.STORAGE_KEY_CURRENT_USER, this.userEmail);
         }
 
         private revivePreviousUser(): void {
-            const user: string | null = this.vorpalInstance.localStorage.getItem(UserApi.STORAGE_KEY_CURRENT_USER);
+            const getUserCB = (err: any, val: any) => {
+                const user: string | null =  val;
 
-            this.userEmail = user || "";
+                this.userEmail = user || "";
 
-            if (user) {
-                this.updateUserNumbers(user)
-            }
+                if (user) {
+                    this.updateUserNumbers(user)
+                }
+            };
+
+            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(UserApi.STORAGE_KEY_CURRENT_USER, getUserCB);
         }
 
-        private fetchExperimentRange(): number[] | null {
+        private fetchExperimentRange(): RangeTuple | null {
             let expRange: number[] | null = null;
+            let keepFirst: boolean = false;
+            let retVal: RangeTuple | null;
 
-            this.vorpalInstance.emit(ExpEvents.REQUEST_RANGE, (range: number[]) => {
+            this.vorpalInstance.emit(ExpEvents.REQUEST_RANGE, (range: number[], isFirstPosFixed: boolean) => {
                 expRange = range;
+                keepFirst = isFirstPosFixed;
             });
 
-            return expRange;
+            if (expRange) {
+                retVal =  [expRange, keepFirst];
+            } else {
+                retVal = null;
+            }
+
+            //return expRange;
+            return retVal;
         }
 
         private static readonly STORAGE_KEY_CURRENT_USER: string = "current-user";
@@ -197,7 +232,7 @@ export module exp_run {
         private static readonly VALID_FAIL_DESC_SET_USER: string = "Cannot set user email address to invalid user email address";
         private static readonly ACTION_DESC_SET_USER: string = "Setting user email address to: ";
         private static readonly ACTION_DESC_SET_USER_EMPTY: string = "Unsetting user email address";
-        private static readonly ACTION_DESC_SET_USER_NUMBERS_FAIL: string = "Could not generate user experment order because experiment range has not been set";
+        private static readonly ACTION_DESC_SET_USER_NUMBERS_FAIL: string = "Could not generate user experiment order because experiment range has not been set";
 
         private static readonly COMMAND_NAME_GET_USER_ORDER: string = "get-user-order";
         private static readonly COMMAND_DESC_GET_USER_ORDER: string = "Gets the user's experiment order";
