@@ -1,4 +1,3 @@
-import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import every from "lodash/every";
 import isNum from "lodash/isNumber";
@@ -100,6 +99,8 @@ export module exp_run {
                     rangeSetter(range || [], keepFirstPos);
 
                     rangeNumbersWrapper();
+
+                    this.parent.emit(ExpEvents.EVT_RANGE_SET);
 
                     callback();
                 });

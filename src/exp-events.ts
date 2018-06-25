@@ -1,5 +1,6 @@
 
 export enum ExpEvents {
     REQUEST_DIR = "REQUEST_DIR",
-    REQUEST_RANGE= "REQUEST_RANGE",
+    REQUEST_RANGE = "REQUEST_RANGE",
+    EVT_RANGE_SET = "EVT_RANGE_SET",
 }

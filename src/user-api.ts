@@ -17,6 +17,7 @@ export module exp_run {
     export class UserApi implements API {
 
         constructor(private vorpalInstance: Vorpal) {
+            this.configureEventListeners();
             this.revivePreviousUser();
             this.setupUserGetter();
             this.setupUserSetter();
@@ -25,6 +26,13 @@ export module exp_run {
         }
 
         public get emailAddress(): string { return this.userEmail; }
+
+        private configureEventListeners(): void {
+            const vI = this.vorpalInstance;
+            this.updateUserNumbersOnRangeUpdate = this.updateUserNumbersOnRangeUpdate.bind(this);
+
+            vI.on(ExpEvents.EVT_RANGE_SET, this.updateUserNumbersOnRangeUpdate);
+        }
 
         private setupUserGetter() {
             const userGetter = () => {
@@ -145,7 +153,7 @@ export module exp_run {
 
                     this.log(message);
 
-                    fsExtra.writeJSONSync(filePath, { email: userEmailGetter(), "exp_order": userNumGetter() })
+                    fsExtra.writeJSONSync(filePath, { email: userEmailGetter(), "exp_order": userNumGetter() });
 
                     callback();
                 });
@@ -170,9 +178,18 @@ export module exp_run {
                     } else {
                         userNums.push(...randomOrderGen.pickset(nums, nums.length));
                     }
+                    this.vorpalInstance.log(`${UserApi.ACTION_DESC_SET_USER_USER_ORDER}${userNums}`)
                 } else {
                     this.vorpalInstance.log(UserApi.ACTION_DESC_SET_USER_NUMBERS_FAIL)
                 }
+            }
+        }
+
+        private updateUserNumbersOnRangeUpdate() : void {
+            const email: string = this.userEmail;
+
+            if (email) {
+                this.updateUserNumbers(email);
             }
         }
 
@@ -224,6 +241,7 @@ export module exp_run {
         private static readonly COMMAND_DESC_SET_USER: string = "Sets the user email address. Passing no value unsets the user email address.";
         private static readonly VALID_FAIL_DESC_SET_USER: string = "Cannot set user email address to invalid user email address";
         private static readonly ACTION_DESC_SET_USER: string = "Setting user email address to: ";
+        private static readonly ACTION_DESC_SET_USER_USER_ORDER: string = "Setting user experiment order to: ";
         private static readonly ACTION_DESC_SET_USER_EMPTY: string = "Unsetting user email address";
         private static readonly ACTION_DESC_SET_USER_NUMBERS_FAIL: string = "Could not generate user experiment order because experiment range has not been set";
 
