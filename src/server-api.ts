@@ -9,7 +9,7 @@ export module exp_run {
 
     export class ServerApi implements API {
 
-        constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
+        constructor(private vorpalInstance: Vorpal) {
             this.setupServerGetter();
             this.setupServerSetter();
             this.setupServerRedirectGetter();

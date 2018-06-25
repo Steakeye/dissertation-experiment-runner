@@ -6,13 +6,12 @@ import Chance from "chance";
 import {isEmail} from "validator";
 import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
-import {MetaApi} from "./meta-api";
 
 export module exp_run {
 
     export class UserApi implements API {
 
-        constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
+        constructor(private vorpalInstance: Vorpal) {
             this.revivePreviousUser();
             this.setupUserGetter();
             this.setupUserSetter();
@@ -104,7 +103,7 @@ export module exp_run {
                 return this.userNumbers;
             };
 
-            const pb: EventEmitter = this.pubSub;
+            const pb: EventEmitter = this.vorpalInstance;
 
             let sentDir: string | null = null;
 
@@ -179,7 +178,7 @@ export module exp_run {
         private fetchExperimentRange(): number[] | null {
             let expRange: number[] | null = null;
 
-            this.pubSub.emit(ExpEvents.REQUEST_RANGE, (range: number[]) => {
+            this.vorpalInstance.emit(ExpEvents.REQUEST_RANGE, (range: number[]) => {
                 expRange = range;
             });
 

@@ -13,7 +13,7 @@ export module exp_run {
 
     export class MetaApi implements API {
 
-        constructor(private vorpalInstance: Vorpal, private pubSub: EventEmitter) {
+        constructor(private vorpalInstance: Vorpal) {
             this.configureEventListeners();
             this.revivePreviousRange();
             this.revivePreviousSaveDir();
@@ -179,7 +179,7 @@ export module exp_run {
 
         private configureEventListeners(): void {
             this.publishDirValue = this.publishDirValue.bind(this);
-            this.pubSub.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
+            this.vorpalInstance.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
         }
 
         private publishDirValue(cb: (dir: string) => void): void {

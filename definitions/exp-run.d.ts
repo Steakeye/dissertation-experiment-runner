@@ -6,5 +6,5 @@ export interface API {
 }
 
 export interface APICtor {
-    new (vorpalInstance: Vorpal, evtEmitter: EventEmitter): API;
+    new (vorpalInstance: Vorpal): API;
 }
