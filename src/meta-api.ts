@@ -35,16 +35,19 @@ export module exp_run {
         public get directory(): string { return this.saveDir; }
 
         private setupRangeGetter() {
-            const rangeGetter = () => {
-                return this.expRange;
+            const rangeGetter = (): RangeTuple => {
+                return [this.expRange, this.rangeFixedFirstPos];
             };
 
             this.vorpalInstance
                 .command(MetaApi.COMMAND_NAME_GET_RANGE, MetaApi.COMMAND_DESC_GET_RANGE)
                 .action(function(args, callback) {
-                    const range: number[] = rangeGetter();
+                    const rangeTuple: RangeTuple = rangeGetter();
+                    const range: number[] = rangeTuple[0];
                     const hasEmailAddress: boolean = !!range.length;
-                    const message: string = hasEmailAddress ? `${MetaApi.ACTION_DESC_GET_RANGE}${range}` : MetaApi.ACTION_DESC_GET_RANGE_NOT_SET;
+                    const keepFirstPos: boolean = rangeTuple[1];
+                    const message: string = hasEmailAddress ? `${MetaApi.ACTION_DESC_GET_RANGE}${range} - ${MetaApi.ACTION_DESC_RANGE_KEEP_FIRST}${keepFirstPos}` :
+                        MetaApi.ACTION_DESC_GET_RANGE_NOT_SET;
 
                     this.log(message);
 
@@ -88,11 +91,13 @@ export module exp_run {
                 })
                 .action(function(args, callback) {
                     const range: number[] = <number[]><any>args.numbers;
-                    const message: string = range ? `${MetaApi.ACTION_DESC_SET_RANGE}${range}`: MetaApi.ACTION_DESC_SET_RANGE_EMPTY;
+                    const keepFirstPos: boolean = !!args.options["keep-first"];
+                    const message: string = range ? `${MetaApi.ACTION_DESC_SET_RANGE}${range} - ${MetaApi.ACTION_DESC_RANGE_KEEP_FIRST}${keepFirstPos}`:
+                        MetaApi.ACTION_DESC_SET_RANGE_EMPTY;
 
                     this.log(message);
 
-                    rangeSetter(range || []);
+                    rangeSetter(range || [], keepFirstPos);
 
                     rangeNumbersWrapper();
 
@@ -170,12 +175,13 @@ export module exp_run {
         }
 
         private revivePreviousRange(): void {
-            const getRangeCB = (val: string) => {
-                const rangeData: RangeTuple | undefined =  val && JSON.parse(val);
+            const getRangeCB = (val: RangeTuple) => {
+                //const rangeData: RangeTuple | undefined =  val && JSON.parse(val);
 
-                if (rangeData) {
-                    this.expRange.push(...rangeData[0]);
-                    this.rangeFixedFirstPos = rangeData[1];
+
+                if (val) {
+                    this.expRange.push(...val[0]);
+                    this.rangeFixedFirstPos = val[1];
                 }
             };
 
@@ -224,8 +230,11 @@ export module exp_run {
         private static readonly OPTION_DESC_SET_RANGE_KEEP_FIRST_POS: string = "Determines whether the range is expected to always have the first value fixed";
         private static readonly VALID_FAIL_DESC_SET_RANGE: string = "Cannot set the experiment range as values must be unique numbers";
         private static readonly ACTION_DESC_SET_RANGE: string = "Setting experiment range to: ";
+        private static readonly ACTION_DESC_SET_RANGE_KEEP_FIRST: string = "First item position preserved: ";
         private static readonly ACTION_DESC_SET_RANGE_EMPTY: string = "Unsetting experiment range";
-        
+
+        private static readonly ACTION_DESC_RANGE_KEEP_FIRST: string = "First item position preserved: ";
+
         private static readonly COMMAND_NAME_GET_SAVE_DIR: string = "get-save-dir";
         private static readonly COMMAND_DESC_GET_SAVE_DIR: string = "Gets the experiment save directory";
         private static readonly ACTION_DESC_GET_SAVE_DIR: string = "Experiment save directory set to: ";
