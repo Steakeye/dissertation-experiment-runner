@@ -16,6 +16,9 @@ export module exp_run {
 
     export class UserApi implements API {
 
+        public static readonly COMMAND_NAME_GET_USER: string = "get-user";
+        public static readonly COMMAND_NAME_GET_USER_ORDER: string = "get-user-order";
+
         constructor(private vorpalInstance: Vorpal) {
             this.configureEventListeners();
             this.revivePreviousUser();
@@ -232,7 +235,6 @@ export module exp_run {
 
         private static readonly STORAGE_KEY_CURRENT_USER: string = "current-user";
 
-        private static readonly COMMAND_NAME_GET_USER: string = "get-user";
         private static readonly COMMAND_DESC_GET_USER: string = "Gets the current user email";
         private static readonly ACTION_DESC_GET_USER: string = "User email address set to: ";
         private static readonly ACTION_DESC_GET_USER_NOT_SET: string = "User email address not set!";
@@ -245,7 +247,6 @@ export module exp_run {
         private static readonly ACTION_DESC_SET_USER_EMPTY: string = "Unsetting user email address";
         private static readonly ACTION_DESC_SET_USER_NUMBERS_FAIL: string = "Could not generate user experiment order because experiment range has not been set";
 
-        private static readonly COMMAND_NAME_GET_USER_ORDER: string = "get-user-order";
         private static readonly COMMAND_DESC_GET_USER_ORDER: string = "Gets the user's experiment order";
         private static readonly ACTION_DESC_GET_USER_ORDER: string = "User's experiment order is: ";
         private static readonly ACTION_DESC_GET_USER_ORDER_NOT_SET: string = "User's experiment order not set (probably as there is no user email).";

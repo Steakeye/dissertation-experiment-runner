@@ -9,7 +9,7 @@ import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
 import {vorpal_appdata} from "./plugins/vorpal-appdata";
 import {exp_run as server} from "./server-api";
-import {async} from "q";
+import {exp_run as user} from "./user-api";
 
 export module exp_run {
 
@@ -58,6 +58,15 @@ export module exp_run {
                     func._fn.apply(this, funcArgs);
 
                     func = <VorpalCommandWithFn>this.parent.find(server.ServerApi.COMMAND_NAME_GET_SERVER_REDIRECT);
+                    func._fn.apply(this, funcArgs);
+
+                    func = <VorpalCommandWithFn>this.parent.find(MetaApi.COMMAND_NAME_GET_RANGE);
+                    func._fn.apply(this, funcArgs);
+
+                    func = <VorpalCommandWithFn>this.parent.find(user.UserApi.COMMAND_NAME_GET_USER);
+                    func._fn.apply(this, funcArgs);
+
+                    func = <VorpalCommandWithFn>this.parent.find(user.UserApi.COMMAND_NAME_GET_USER_ORDER);
                     func._fn.apply(this, funcArgs);
 
                     callback();
