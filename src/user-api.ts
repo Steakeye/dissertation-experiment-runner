@@ -159,7 +159,7 @@ export module exp_run {
                 });
         }
 
-        private updateUserNumbers(emailAddress: string): void {
+        private updateUserNumbers(emailAddress: string, silent: boolean = false): void {
             const userNums: number[] = this.userNumbers;
 
             userNums.length = 0;
@@ -178,9 +178,9 @@ export module exp_run {
                     } else {
                         userNums.push(...randomOrderGen.pickset(nums, nums.length));
                     }
-                    this.vorpalInstance.log(`${UserApi.ACTION_DESC_SET_USER_USER_ORDER}${userNums}`)
+                    !silent && this.vorpalInstance.log(`${UserApi.ACTION_DESC_SET_USER_USER_ORDER}${userNums}`)
                 } else {
-                    this.vorpalInstance.log(UserApi.ACTION_DESC_SET_USER_NUMBERS_FAIL)
+                    !silent && this.vorpalInstance.log(UserApi.ACTION_DESC_SET_USER_NUMBERS_FAIL)
                 }
             }
         }
@@ -204,7 +204,7 @@ export module exp_run {
                 this.userEmail = user || "";
 
                 if (user) {
-                    this.updateUserNumbers(user)
+                    this.updateUserNumbers(user, true)
                 }
             };
 

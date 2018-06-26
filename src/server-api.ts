@@ -4,12 +4,18 @@ import {isURL} from "validator";
 import range from "lodash/range";
 import fetch, { Response as NFResponse } from "node-fetch";
 import {API} from "../definitions/exp-run";
+import {vorpal_appdata} from "./plugins/vorpal-appdata"
 
 export module exp_run {
 
+    import VorpalWithAppdate = vorpal_appdata.VorpalWithAppdata;
+
     export class ServerApi implements API {
+        public static readonly COMMAND_NAME_GET_SERVER: string = "get-server";
+        public static readonly COMMAND_NAME_GET_SERVER_REDIRECT: string = "get-server-redirect";
 
         constructor(private vorpalInstance: Vorpal) {
+            this.revivePreviousServer();
             this.setupServerGetter();
             this.setupServerSetter();
             this.setupServerRedirectGetter();
@@ -17,6 +23,14 @@ export module exp_run {
         }
 
         public get url(): string { return this.serverUrl; }
+
+        private revivePreviousServer(): void {
+            const getServerCB = (val: string) => {
+                this.serverUrl = val || "";
+            };
+
+            (<VorpalWithAppdate>this.vorpalInstance).appData.getItem(ServerApi.STORAGE_KEY_CURRENT_SERVER).then(getServerCB);
+        }
 
         private setupServerGetter() {
             const serverGetter = () => {
@@ -38,6 +52,7 @@ export module exp_run {
         private setupServerSetter() {
             const serverSetter = (url: string) => {
                 this.serverUrl = url;
+                (<VorpalWithAppdate>this.vorpalInstance).appData.setItem(ServerApi.STORAGE_KEY_CURRENT_SERVER, url);
             };
 
             this.vorpalInstance
@@ -75,7 +90,9 @@ export module exp_run {
                 .command(ServerApi.COMMAND_NAME_GET_SERVER_REDIRECT, ServerApi.COMMAND_DESC_GET_SERVER_REDIRECT)
                 .action(function(args, callback) {
                     const num: number = <number>serverRedirectGetter();
-                    const message: string = num !== null ? `${ServerApi.ACTION_DESC_GET_SERVER_REDIRECT}${num}` : ServerApi.ACTION_DESC_GET_SERVER_REDIRECT_NOT_SET;
+                    const message: string = num !== null ?
+                        `${ServerApi.ACTION_DESC_GET_SERVER_REDIRECT}${num}` :
+                        ServerApi.ACTION_DESC_GET_SERVER_REDIRECT_NOT_SET;
 
                     this.log(message);
 
@@ -138,7 +155,8 @@ export module exp_run {
 
         }
 
-        private static readonly COMMAND_NAME_GET_SERVER: string = "get-server";
+        private static readonly STORAGE_KEY_CURRENT_SERVER: string = "current-server";
+
         private static readonly COMMAND_DESC_GET_SERVER: string = "Gets the current server URL";
         private static readonly ACTION_DESC_GET_SERVER: string = "Server URL set to: ";
         private static readonly ACTION_DESC_GET_SERVER_NOT_SET: string = "Server URL not set!";
@@ -149,7 +167,6 @@ export module exp_run {
         private static readonly ACTION_DESC_SET_SERVER: string = "Setting server URL to: ";
         private static readonly ACTION_DESC_SET_SERVER_EMPTY: string = "Unsetting server URL";
 
-        private static readonly COMMAND_NAME_GET_SERVER_REDIRECT: string = "get-server-redirect";
         private static readonly COMMAND_DESC_GET_SERVER_REDIRECT: string = "Gets the server redirect endpoint";
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT: string = "Server redirect endpoint set to: ";
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT_NOT_SET: string = "Server redirect endpoint not set!";

@@ -8,6 +8,8 @@ import path from "path";
 import {API} from "../definitions/exp-run";
 import {ExpEvents} from "./exp-events";
 import {vorpal_appdata} from "./plugins/vorpal-appdata";
+import {exp_run as server} from "./server-api";
+import {async} from "q";
 
 export module exp_run {
 
@@ -18,12 +20,15 @@ export module exp_run {
         1:boolean
     }
 
+    type VorpalCommandWithFn = Vorpal.Command & { _fn: () => void };
+
     export class MetaApi implements API {
 
         constructor(private vorpalInstance: Vorpal) {
             this.configureEventListeners();
             this.revivePreviousRange();
             this.revivePreviousSaveDir();
+            this.setupDetailsGetter();
             this.setupRangeGetter();
             this.setupRangeSetter();
             this.setupDirGetter();
@@ -32,6 +37,32 @@ export module exp_run {
 
         public get range(): number[] { return this.expRange; }
         public get directory(): string { return this.saveDir; }
+
+        private setupDetailsGetter() {
+            const rangeGetter = (): RangeTuple => {
+                return [this.expRange, this.rangeFixedFirstPos];
+            };
+
+            this.vorpalInstance
+                .command(MetaApi.COMMAND_NAME_GET_DETAILS, MetaApi.COMMAND_DESC_GET_DETAILS)
+                .action(function(args, callback) {
+                    const noOp = () => {};
+                    const funcArgs: any[] = [undefined, noOp];
+
+                    this.log(MetaApi.ACTION_DESC_GET_DETAILS);
+
+                    let func: VorpalCommandWithFn = <VorpalCommandWithFn>this.parent.find(MetaApi.COMMAND_NAME_GET_SAVE_DIR);
+                    func._fn.apply(this, funcArgs);
+
+                    func = <VorpalCommandWithFn>this.parent.find(server.ServerApi.COMMAND_NAME_GET_SERVER);
+                    func._fn.apply(this, funcArgs);
+
+                    func = <VorpalCommandWithFn>this.parent.find(server.ServerApi.COMMAND_NAME_GET_SERVER_REDIRECT);
+                    func._fn.apply(this, funcArgs);
+
+                    callback();
+                });
+        }
 
         private setupRangeGetter() {
             const rangeGetter = (): RangeTuple => {
@@ -194,9 +225,8 @@ export module exp_run {
         }
 
         private revivePreviousSaveDir(): void {
-            const saveDirCB = (val: any) => {
-                const dir: string | null = val;
-                this.saveDir = dir !== null ? <string>dir : "";
+            const saveDirCB = (val: string | undefined) => {
+                this.saveDir =  <string>val || "";
             };
 
             (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_SAVE_DIR).then(saveDirCB);
@@ -218,6 +248,10 @@ export module exp_run {
         private publishRangeValue(cb: (range: number[], fixedFirstPosition: boolean) => void): void {
             cb(this.expRange, this.rangeFixedFirstPos);
         }
+
+        private static readonly COMMAND_NAME_GET_DETAILS: string = "get-details";
+        private static readonly COMMAND_DESC_GET_DETAILS: string = "Gets the all the details set up in the experiment runner";
+        private static readonly ACTION_DESC_GET_DETAILS: string = "Details are as follows...";
 
         private static readonly COMMAND_NAME_GET_RANGE: string = "get-range";
         private static readonly COMMAND_DESC_GET_RANGE: string = "Gets the experiment range";

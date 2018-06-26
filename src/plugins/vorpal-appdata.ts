@@ -4,7 +4,6 @@ import NodePersist, {InitOptions} from 'node-persist';
 import appRoot from 'app-root-path'
 
 export namespace vorpal_appdata {
-    import Platform = NodeJS.Platform;
 
     export interface NodePersistAPI {
         init(options?: InitOptions, callback?: Function): Q.Promise<any>;
