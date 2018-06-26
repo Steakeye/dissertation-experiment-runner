@@ -34,9 +34,11 @@ export module exp_run {
             const vI = this.vorpalInstance;
             this.updateUserNumbersOnRangeUpdate = this.updateUserNumbersOnRangeUpdate.bind(this);
             this.onRequestUserOrder = this.onRequestUserOrder.bind(this);
+            this.onRequestSaveUser = this.onRequestSaveUser.bind(this);
 
             vI.on(ExpEvents.EVT_RANGE_SET, this.updateUserNumbersOnRangeUpdate);
             vI.on(ExpEvents.REQUEST_USER_ORDER, this.onRequestUserOrder);
+            vI.on(ExpEvents.REQUEST_SAVE_USER, this.onRequestSaveUser);
         }
 
         private setupUserGetter() {

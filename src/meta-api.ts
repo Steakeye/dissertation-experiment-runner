@@ -14,6 +14,7 @@ import {exp_run as user} from "./user-api";
 export module exp_run {
 
     import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
+    //import Prompt = ui.Prompt;
 
     export interface RangeTuple {
         0: number[],
@@ -262,27 +263,40 @@ export module exp_run {
         }
 
         private startPrompts(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void): any {
-            this.startSavePrompt(vorpalCommand, commandCb);
+            const beginRunningExp: (commandCb: () => void) => void = this.setupOrderCycling(vorpalCommand);
+
+            return this.startSavePrompt(vorpalCommand, commandCb, beginRunningExp);
         }
-        private startSavePrompt(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void): any {
+        private startSavePrompt(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void, next: (commandCb: () => void) => void): any {
             return vorpalCommand.prompt({
                 type: 'confirm',
                 name: 'save',
                 default: true,
                 message: 'Save current user details??',
-            }, function(result: { save: boolean }){
-                if (!result.save) {
-                    vorpalCommand.log('You will save.');
-
-
-
-                    commandCb();
-                } else {
-                    vorpalCommand.log('No save.');
-                    //app.destroyDatabase(commandCb);
-                    commandCb();
+            }, (result: { save: boolean }) => {
+                if (result.save) {
+                    this.vorpalInstance.emit(ExpEvents.REQUEST_SAVE_USER);
                 }
+                    /*commandCb();
+                } else {
+                    commandCb();
+                }*/
+                next(commandCb);
             });
+        }
+
+        private setupOrderCycling(vorpalCommand: Vorpal.CommandInstance): (commandCb: () => void) => void {
+            return (commandCb: () => void) => {
+                vorpalCommand.prompt({
+                    type: 'confirm',
+                    name: 'blah',
+                    default: true,
+                    message: 'Blah!!!',
+                }, (result: { save: boolean }) => {
+                    this.vorpalInstance.log("we got results from a second prompt");
+                    commandCb();
+                });
+            }
         }
 
         private updateRangeNumbers(): void {
