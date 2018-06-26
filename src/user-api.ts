@@ -33,8 +33,10 @@ export module exp_run {
         private configureEventListeners(): void {
             const vI = this.vorpalInstance;
             this.updateUserNumbersOnRangeUpdate = this.updateUserNumbersOnRangeUpdate.bind(this);
+            this.onRequestUserOrder = this.onRequestUserOrder.bind(this);
 
             vI.on(ExpEvents.EVT_RANGE_SET, this.updateUserNumbersOnRangeUpdate);
+            vI.on(ExpEvents.REQUEST_USER_ORDER, this.onRequestUserOrder);
         }
 
         private setupUserGetter() {
@@ -122,16 +124,14 @@ export module exp_run {
                 return this.userNumbers;
             };
 
-            const pb: EventEmitter = this.vorpalInstance;
+            const userApi: UserApi = this;
 
-            let sentDir: string | null = null;
+            let saveDir: string | null = null;
 
             this.vorpalInstance
                 .command(UserApi.COMMAND_NAME_SAVE_CURRENT_USER, UserApi.COMMAND_DESC_SAVE_CURRENT_USER)
                 .validate(function(args) {
-                    pb.emit(ExpEvents.REQUEST_DIR, (dir: string) => {
-                        sentDir = dir;
-                    });
+                    saveDir = userApi.fetchSaveDir();
 
                     const email: string = userEmailGetter();
                     const userNums: number[] = userNumGetter();
@@ -140,7 +140,7 @@ export module exp_run {
 
                     let result: string | true;
 
-                    if (!sentDir) {
+                    if (!saveDir) {
                         result = UserApi.VALID_FAIL_DESC_SAVE_CURRENT_USER_DIR;
                     } else if (hasEmail && hasUserNums) {
                         result = true;
@@ -151,15 +151,19 @@ export module exp_run {
                     return <string | true>result;
                 })
                 .action(function(args, callback) {
-                    const filePath: string = `${sentDir}/${userEmailGetter()}.json`;
-                    const message: string = `${UserApi.ACTION_DESC_SAVE_CURRENT_USER}${filePath}`;
-
-                    this.log(message);
-
-                    fsExtra.writeJSONSync(filePath, { email: userEmailGetter(), "exp_order": userNumGetter() });
+                    userApi.doSaveUser(<string>saveDir, userEmailGetter(), userNumGetter());
 
                     callback();
                 });
+        }
+
+        private doSaveUser(saveDir: string, email: string, userOrder: number[]): void {
+            const filePath: string = `${saveDir}/${email}.json`;
+            const message: string = `${UserApi.ACTION_DESC_SAVE_CURRENT_USER}${filePath}`;
+
+            this.vorpalInstance.log(message);
+
+            fsExtra.writeJSONSync(filePath, { email: email, "exp_order": userOrder });
         }
 
         private updateUserNumbers(emailAddress: string, silent: boolean = false): void {
@@ -196,6 +200,16 @@ export module exp_run {
             }
         }
 
+        private onRequestUserOrder(cb: (nums: number[] | null) => void) : void {
+            const nums: number[] = this.userNumbers;
+
+            cb(nums.length ? nums : null);
+        }
+
+        private onRequestSaveUser() : void {
+            this.doSaveUser(<string>this.fetchSaveDir(), this.userEmail, this.userNumbers);
+        }
+
         private cacheCurrentUser(): void {
             (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(UserApi.STORAGE_KEY_CURRENT_USER, this.userEmail);
         }
@@ -212,6 +226,16 @@ export module exp_run {
             };
 
             (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(UserApi.STORAGE_KEY_CURRENT_USER).then(getUserCB);
+        }
+
+        private fetchSaveDir(): string | null {
+            let saveDir: string | null = null;
+
+            this.vorpalInstance.emit(ExpEvents.REQUEST_DIR, (dir: string) => {
+                saveDir = dir;
+            });
+
+            return saveDir;
         }
 
         private fetchExperimentRange(): RangeTuple | null {

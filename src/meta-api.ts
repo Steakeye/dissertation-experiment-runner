@@ -28,6 +28,7 @@ export module exp_run {
             this.configureEventListeners();
             this.revivePreviousRange();
             this.revivePreviousSaveDir();
+            this.setupExpRunner();
             this.setupDetailsGetter();
             this.setupRangeGetter();
             this.setupRangeSetter();
@@ -211,6 +212,79 @@ export module exp_run {
                 });
         }
 
+        private setupExpRunner() {
+            const dirSetter = (dir: string) => {
+                this.saveDir = dir;
+            };
+            const saveDirWrapper = () => {
+                this.updateSaveDir();
+            };
+            const pathResolver = (args: Vorpal.Args) => {
+                //return args.directory && path.resolve(__dirname, <string>args.directory);
+                //return args.directory && expandTilde(<string>args.directory);
+                return args.directory && path.resolve(__dirname, expandTilde(<string>args.directory));
+            };
+
+            const meta : MetaApi = this;
+            const vI : Vorpal = this.vorpalInstance;
+
+            let serverUrl: string | null = null;
+            let userOrder: number[] | null = null;
+
+            vI.command(MetaApi.COMMAND_NAME_RUN_EXP, MetaApi.COMMAND_DESC_RUN_EXP)
+                .validate(function (args) {
+                    const messageArr: string[] = [];
+
+                    vI.emit(ExpEvents.REQUEST_SERVER, (url: string) => {
+                        serverUrl = url;
+                    });
+                    vI.emit(ExpEvents.REQUEST_USER_ORDER, (nums: number[]) => {
+                        userOrder = nums;
+                    });
+
+                    if (!serverUrl || !userOrder) {
+                        messageArr.push(MetaApi.VALID_FAIL_DESC_RUN_EXP);
+                        !serverUrl && messageArr.push(MetaApi.VALID_FAIL_DESC_RUN_EXP_NO_SERVER);
+                        !userOrder && messageArr.push(MetaApi.VALID_FAIL_DESC_RUN_EXP_NO_USER);
+                    }
+
+                    return messageArr.length ? messageArr.join(' ') : true;
+                })
+                .action(function(args, callback) {
+                    this.log(MetaApi.ACTION_DESC_RUN_EXP);
+                    this.log(`${MetaApi.ACTION_DESC_RUN_EXP_SERVER}${serverUrl}`);
+                    this.log(`${MetaApi.ACTION_DESC_RUN_EXP_USER_ORDER}${userOrder}`);
+
+                    //callback();
+                    //this.prompt
+                    meta.startPrompts(this, callback);
+                });
+        }
+
+        private startPrompts(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void): any {
+            this.startSavePrompt(vorpalCommand, commandCb);
+        }
+        private startSavePrompt(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void): any {
+            return vorpalCommand.prompt({
+                type: 'confirm',
+                name: 'save',
+                default: true,
+                message: 'Save current user details??',
+            }, function(result: { save: boolean }){
+                if (!result.save) {
+                    vorpalCommand.log('You will save.');
+
+
+
+                    commandCb();
+                } else {
+                    vorpalCommand.log('No save.');
+                    //app.destroyDatabase(commandCb);
+                    commandCb();
+                }
+            });
+        }
+
         private updateRangeNumbers(): void {
             (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_RANGE, [this.expRange, this.rangeFixedFirstPos]);
         }
@@ -294,6 +368,14 @@ export module exp_run {
         private static readonly OPTION_FLAG_SAVE_DIR_USER: string = "--user-data, -u";
         private static readonly OPTION_DESC_SAVE_DIR_USER: string = "Specifies the save-directory to be used for user data.";
 
+        private static readonly COMMAND_NAME_RUN_EXP: string = "run-experiments";
+        private static readonly COMMAND_DESC_RUN_EXP: string = "Starts running the configuring the redirect url on the server based on the user experiment order";
+        private static readonly VALID_FAIL_DESC_RUN_EXP: string = "Cannot start running experiments.";
+        private static readonly VALID_FAIL_DESC_RUN_EXP_NO_SERVER: string = "No server url set.";
+        private static readonly VALID_FAIL_DESC_RUN_EXP_NO_USER: string = "No user set.";
+        private static readonly ACTION_DESC_RUN_EXP: string = "Starting experiments...";
+        private static readonly ACTION_DESC_RUN_EXP_SERVER: string = "Server: ";
+        private static readonly ACTION_DESC_RUN_EXP_USER_ORDER: string = "User order: ";
 
         private expRange: number[] = [];
         private rangeFixedFirstPos: boolean = false;

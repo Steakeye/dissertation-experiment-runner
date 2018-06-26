@@ -5,6 +5,7 @@ import range from "lodash/range";
 import fetch, { Response as NFResponse } from "node-fetch";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
+import {ExpEvents} from "./exp-events";
 
 export module exp_run {
 
@@ -15,6 +16,7 @@ export module exp_run {
         public static readonly COMMAND_NAME_GET_SERVER_REDIRECT: string = "get-server-redirect";
 
         constructor(private vorpalInstance: Vorpal) {
+            this.configureEventListeners();
             this.revivePreviousServer();
             this.setupServerGetter();
             this.setupServerSetter();
@@ -23,6 +25,18 @@ export module exp_run {
         }
 
         public get url(): string { return this.serverUrl; }
+
+        private configureEventListeners(): void {
+            const vI = this.vorpalInstance;
+
+            this.onRequestServer = this.onRequestServer.bind(this);
+
+            vI.on(ExpEvents.REQUEST_SERVER, this.onRequestServer);
+        }
+
+        private onRequestServer(cb: (url: string | null) => void) : void {
+            cb(this.serverUrl || null);
+        }
 
         private revivePreviousServer(): void {
             const getServerCB = (val: string) => {
