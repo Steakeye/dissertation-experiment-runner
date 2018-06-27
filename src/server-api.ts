@@ -14,6 +14,7 @@ export module exp_run {
     export class ServerApi implements API {
         public static readonly COMMAND_NAME_GET_SERVER: string = "get-server";
         public static readonly COMMAND_NAME_GET_SERVER_REDIRECT: string = "get-server-redirect";
+        public static readonly COMMAND_NAME_SET_SERVER_REDIRECT: string = "set-server-redirect [number]";
 
         constructor(private vorpalInstance: Vorpal) {
             this.configureEventListeners();
@@ -186,7 +187,6 @@ export module exp_run {
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT_NOT_SET: string = "Server redirect endpoint not set!";
 
         private static readonly PATH_FRAGMENT_SET_SERVER_REDIRECT: string = "/setredirect/";
-        private static readonly COMMAND_NAME_SET_SERVER_REDIRECT: string = "set-server-redirect [number]";
         private static readonly COMMAND_DESC_SET_SERVER_REDIRECT: string = "Sets the server redirect endpoint";
         private static readonly VALID_FAIL_DESC_SET_SERVER_REDIRECT_URL: string = "Cannot set server redirect when server URL not set";
         private static readonly VALID_FAIL_DESC_SET_SERVER_REDIRECT_NUM: string = "Cannot set server redirect to a number out of range (1-8)";
