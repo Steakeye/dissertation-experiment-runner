@@ -14,7 +14,7 @@ export module exp_run {
     export class ServerApi implements API {
         public static readonly COMMAND_NAME_GET_SERVER: string = "get-server";
         public static readonly COMMAND_NAME_GET_SERVER_REDIRECT: string = "get-server-redirect";
-        public static readonly COMMAND_NAME_SET_SERVER_REDIRECT: string = "set-server-redirect [number]";
+        public static readonly COMMAND_NAME_SET_SERVER_REDIRECT: string = "set-server-redirect";
 
         constructor(private vorpalInstance: Vorpal) {
             this.configureEventListeners();
@@ -125,7 +125,7 @@ export module exp_run {
             };
 
             this.vorpalInstance
-                .command(ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT, ServerApi.COMMAND_DESC_SET_SERVER_REDIRECT)
+                .command(ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT_WITH_ARGS, ServerApi.COMMAND_DESC_SET_SERVER_REDIRECT)
                 .validate(function (args) {
                     const num: number | null = <number>args.number || null;
 
@@ -133,7 +133,7 @@ export module exp_run {
 
                     if (!serverIsSet()) {
                         result = ServerApi.VALID_FAIL_DESC_SET_SERVER_REDIRECT_URL;
-                    } else if (!ServerApi.isRedirectWithinRange(<number>num) && num !== null) {
+                    } else if (!ServerApi.isRedirectWithinRange(this.parent, <number>num) && num !== null) {
                         result = ServerApi.VALID_FAIL_DESC_SET_SERVER_REDIRECT_NUM;
                     } else {
                         result = true;
@@ -159,15 +159,24 @@ export module exp_run {
                 this.vorpalInstance.log(text);
                 cb();
             };
+            const errortHandler = (err: any) => {
+                this.vorpalInstance.log(err);
+                cb();
+            };
 
             const fetchPromise: Promise<NFResponse> = this.serverRedirect ? fetch(`${endpoint}${this.serverRedirect}`) : fetch(endpoint, { method: "DELETE" });
 
-            fetchPromise.then(resHandler).then(textHandler);
+            fetchPromise.then(resHandler).then(textHandler, errortHandler);
         }
 
-        private static isRedirectWithinRange(num: number): boolean {
-            return range(1, 9).indexOf(num) != -1;
+        private static isRedirectWithinRange(vI: Vorpal, num: number): boolean {
+            let expRange: number[] = [];
 
+            vI.emit(ExpEvents.REQUEST_RANGE, (range: number[], isFirstPosFixed: boolean) => {
+                expRange = range;
+            });
+
+            return expRange.indexOf(num) != -1;
         }
 
         private static readonly STORAGE_KEY_CURRENT_SERVER: string = "current-server";
@@ -186,6 +195,7 @@ export module exp_run {
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT: string = "Server redirect endpoint set to: ";
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT_NOT_SET: string = "Server redirect endpoint not set!";
 
+        private static readonly COMMAND_NAME_SET_SERVER_REDIRECT_WITH_ARGS: string = `${ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT} [number]`;
         private static readonly PATH_FRAGMENT_SET_SERVER_REDIRECT: string = "/setredirect/";
         private static readonly COMMAND_DESC_SET_SERVER_REDIRECT: string = "Sets the server redirect endpoint";
         private static readonly VALID_FAIL_DESC_SET_SERVER_REDIRECT_URL: string = "Cannot set server redirect when server URL not set";

@@ -253,6 +253,7 @@ export module exp_run {
 
             return this.startSavePrompt(vorpalCommand, commandCb, beginRunningExp);
         }
+
         private startSavePrompt(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void, next: (commandCb: () => void) => void): any {
             return vorpalCommand.prompt({
                 type: 'confirm',
@@ -271,11 +272,13 @@ export module exp_run {
         private setupOrderCycling(vorpalCommand: Vorpal.CommandInstance): (commandCb: () => void) => void {
             const vI: Vorpal = this.vorpalInstance;
             const userOptions: number[] = <number[]>this.fetchUserOrder();
-            const orderOptions: string [] = userOptions.map((val:number, idx: number) => `${idx}: ${val}`);
+            const orderOptions: string [] = userOptions.map((val:number, idx: number) => `${idx+1}: ${val}`);
+            const noOp: () => void = () => {};
+            const selfMeta: MetaApi = this;
 
             orderOptions.push(MetaApi.OPTION_VAL_RUN_EXP_FINISH);
 
-            const vcWFn = <VorpalCommandWithFn>this.vorpalInstance.find(server.ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT);
+            let vcWFn: VorpalCommandWithFn;
 
             const orderIndexAccessor = (updatedVal?: number) : number | void => {
                 if (updatedVal === undefined) {
@@ -286,7 +289,7 @@ export module exp_run {
             };
 
             function selectExperiment(): (commandCb: () => void) => void {
-                return (commandCb: () => void) => {
+                function promptInvoker(commandCb: () => void) {
                     vorpalCommand.prompt({
                         type: 'list',
                         name: MetaApi.OPTION_RESULT_KEY_RUN_EXP,
@@ -294,20 +297,30 @@ export module exp_run {
                         default: orderIndexAccessor(),
                         message: MetaApi.OPTION_TITLE_RUN_EXP,
                     }, (result: { setRedirectTo: string }) => {
-                        vI.log(`setRedirectTo: ${result.setRedirectTo}`);
+                        //vI.log(`setRedirectTo: ${result.setRedirectTo}`);
 
-                        const updatedEndpoint: number = userOptions[orderOptions.indexOf(result.setRedirectTo)];
+                        const updatedOrderIdx: number = orderOptions.indexOf(result.setRedirectTo);
+                        const updatedEndpoint: number = userOptions[updatedOrderIdx];
 
                         if (updatedEndpoint !== undefined) {
-                            vI.log("we continuez!");
-                            orderIndexAccessor(updatedEndpoint);
-                            (<(args: any, opts?: any) => void >vcWFn._fn)({ number: updatedEndpoint });
-                            selectExperiment()
+                            orderIndexAccessor(updatedOrderIdx);
+                            (<(self: Vorpal, args: any, cb: () => void) => void >vcWFn._fn.call)(vI, { number: updatedEndpoint }, noOp);
+                            promptInvoker(commandCb);
+                            vI.ui.input("");
                         } else {
                             vI.log(MetaApi.OPTION_RESULT_KEY_RUN_EXP_END);
+                            selfMeta.expIdx = 0;
                             commandCb();
                         }
                     });
+                }
+
+                return (commandCb: () => void) => {
+                    if (!vcWFn) {
+                        vcWFn = <VorpalCommandWithFn>vI.find(server.ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT);
+                    }
+
+                    promptInvoker(commandCb);
                 }
             }
 
