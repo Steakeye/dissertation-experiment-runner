@@ -21,6 +21,7 @@ export module exp_run {
             this.revivePreviousServer();
             this.setupServerGetter();
             this.setupServerSetter();
+            this.setupServerChecker();
             this.setupServerRedirectGetter();
             this.setupServerRedirectSetter();
         }
@@ -93,6 +94,45 @@ export module exp_run {
                     serverSetter(url || '');
 
                     callback();
+                });
+        }
+
+
+        private setupServerChecker() {
+            const serverGetter = () => {
+                return this.serverUrl;
+            };
+
+            this.vorpalInstance
+                .command(ServerApi.COMMAND_NAME_CHECK_SERVER, ServerApi.COMMAND_DESC_CHECK_SERVER)
+                .action(function(args, callback) {
+                    const url: string = serverGetter();
+                    const serverSet: boolean = !!url.length;
+                    const message: string = serverSet ? `${ServerApi.ACTION_DESC_CHECK_SERVER}${url}` : ServerApi.VALID_FAIL_DESC_CHECK_SERVER_URL;
+
+                    this.log(message);
+
+                    if (url.length) {
+                        const vI: Vorpal = this.parent;
+
+                        const resHandler = (res: NFResponse) => {
+                            return `${res.status} ${res.statusText}`;
+                        };
+                        const textHandler = (text: string) => {
+                            vI.log(`${ServerApi.RESULT_DESC_CHECK_SERVER_RESPONDED}${text}`);
+                            callback();
+                        };
+                        const errortHandler = (err: any) => {
+                            vI.log(`${ServerApi.RESULT_DESC_CHECK_SERVER_FAILED}${err}`);
+                            callback();
+                        };
+
+                        const fetchPromise: Promise<NFResponse> = fetch(url, { method: "HEAD" });
+
+                        fetchPromise.then(resHandler).then(textHandler, errortHandler);
+                    } else {
+                        callback();
+                    }
                 });
         }
 
@@ -190,6 +230,13 @@ export module exp_run {
         private static readonly VALID_FAIL_DESC_SET_SERVER_URL: string = "Cannot set server URL to invalid URL";
         private static readonly ACTION_DESC_SET_SERVER: string = "Setting server URL to: ";
         private static readonly ACTION_DESC_SET_SERVER_EMPTY: string = "Unsetting server URL";
+
+        private static readonly COMMAND_NAME_CHECK_SERVER: string = "check-server";
+        private static readonly COMMAND_DESC_CHECK_SERVER: string = "Checks the server is responding.";
+        private static readonly VALID_FAIL_DESC_CHECK_SERVER_URL: string = "Cannot check server as server URL not set";
+        private static readonly ACTION_DESC_CHECK_SERVER: string = "Checking server: ";
+        private static readonly RESULT_DESC_CHECK_SERVER_RESPONDED: string = "Server responded: ";
+        private static readonly RESULT_DESC_CHECK_SERVER_FAILED: string = "Server response: failure: ";
 
         private static readonly COMMAND_DESC_GET_SERVER_REDIRECT: string = "Gets the server redirect endpoint";
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT: string = "Server redirect endpoint set to: ";
