@@ -249,7 +249,7 @@ export module exp_run {
 
                     meta.startPrompts(this, callback);
 
-                    vI.on(EVT_VORPAL_KEYPRESS, meta.checkForExitInput);
+                    vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(callback));
                 });
         }
 
@@ -260,22 +260,30 @@ export module exp_run {
         }
 
         private startSavePrompt(vorpalCommand: Vorpal.CommandInstance, commandCb: () => void, next: (commandCb: () => void) => void): any {
+            const vI = this.vorpalInstance;
+            const meta = this;
+
             return vorpalCommand.prompt({
                 type: 'confirm',
                 name: 'save',
                 default: true,
-                message: 'Save current user details??',
+                message: MetaApi.OPTION_TITLE_RUN_EXP_SAVE_USER,
             }, (result: { save: boolean }) => {
                 if (result.save) {
                     this.vorpalInstance.emit(ExpEvents.REQUEST_SAVE_USER);
                 }
 
+                //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
+
                 next(commandCb);
+
+                //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
             });
         }
 
         private setupOrderCycling(vorpalCommand: Vorpal.CommandInstance): (commandCb: () => void) => void {
             const vI: Vorpal = this.vorpalInstance;
+            const meta: MetaApi = this;
             const userOptions: number[] = <number[]>this.fetchUserOrder();
             const orderOptions: string [] = userOptions.map((val:number, idx: number) => `${idx+1}: ${val}`);
             const noOp: () => void = () => {};
@@ -298,12 +306,15 @@ export module exp_run {
 
             function selectExperiment(): (commandCb: () => void) => void {
                 function promptInvoker(commandCb: () => void) {
+
+                    //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
+
                     vorpalCommand.prompt({
-                        type: 'list',
+                        type: 'rawlist',
                         name: MetaApi.OPTION_RESULT_KEY_RUN_EXP,
                         choices: orderOptions,
                         default: orderIndexAccessor(),
-                        message: MetaApi.OPTION_TITLE_RUN_EXP,
+                        message: MetaApi.OPTION_TITLE_RUN_EXP_SET_REDIRECT,
                     }, (result: { setRedirectTo: string }) => {
 
                         const updatedOrderIdx: number = orderOptions.indexOf(result.setRedirectTo);
@@ -322,6 +333,8 @@ export module exp_run {
                             commandCb();
                         }
                     });
+
+                    //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
                 }
 
                 return (commandCb: () => void) => {
@@ -393,15 +406,21 @@ export module exp_run {
             cb(this.expRange, this.rangeFixedFirstPos);
         }
 
-        private checkForExitInput(evt : { key: string, value: string, e: Event }): void {
-            this.vorpalInstance.log('checkForExitInput: ' + evt.key);
+        private createCheckForExitInput(cb: () => void): (evt : { key: string, value: string, e: Event }) => void {
+            const vI: Vorpal = this.vorpalInstance;
+            const checkForExitInput: (evt : { key: string, value: string, e: Event }) => void = (evt : { key: string, value: string, e: Event }) => {
 
-            if (evt.key === EVT_VORPAL_KEYPRESS_ESC_KEY) {
-                this.vorpalInstance.log('Esc was pressed, exiting experiments early...');
-                this.vorpalInstance.log(evt);
-                //this.vorpalInstance.off(EVT_VORPAL_KEYPRESS, this.checkForExitInput);
-                this.vorpalInstance.ui.cancel();
-            }
+                //console.log('checkForExitInput: ' + evt.key);
+
+                if (evt.key === EVT_VORPAL_KEYPRESS_ESC_KEY) {
+                    vI.log('Esc was pressed, exiting experiments early...');
+                    vI.removeListener(EVT_VORPAL_KEYPRESS, checkForExitInput);
+                    vI.ui.cancel();
+                    cb();
+                }
+            };
+
+            return checkForExitInput;
         }
 
 
@@ -460,7 +479,8 @@ export module exp_run {
         private static readonly ACTION_DESC_RUN_EXP: string = "Starting experiments...";
         private static readonly ACTION_DESC_RUN_EXP_SERVER: string = "Server: ";
         private static readonly ACTION_DESC_RUN_EXP_USER_ORDER: string = "User order: ";
-        private static readonly OPTION_TITLE_RUN_EXP: string = "Set redirect to:";
+        private static readonly OPTION_TITLE_RUN_EXP_SAVE_USER: string = "Save current user details?";
+        private static readonly OPTION_TITLE_RUN_EXP_SET_REDIRECT: string = "Set redirect to:";
         private static readonly OPTION_VAL_RUN_EXP_FINISH: string = "Complete experiments!";
         private static readonly OPTION_RESULT_KEY_RUN_EXP: string = "setRedirectTo";
         private static readonly OPTION_RESULT_KEY_RUN_EXP_END: string = "Exiting experiment running mode...";
