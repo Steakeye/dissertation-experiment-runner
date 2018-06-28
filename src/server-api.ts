@@ -118,7 +118,7 @@ export module exp_run {
         private setupServerRedirectSetter() {
             const serverSetter = (url: number | null, cb: () => void) => {
                 this.serverRedirect = url;
-                this.updateServerRedirect(cb);
+                this.requestServerRedirectUpdate(cb);
             };
             const serverIsSet = () => {
                 return !!this.serverUrl.length;
@@ -150,7 +150,7 @@ export module exp_run {
                 });
         }
 
-        private updateServerRedirect(cb: () => void): void {
+        private requestServerRedirectUpdate(cb: () => void): void {
             const endpoint: string = `${this.serverUrl}${ServerApi.PATH_FRAGMENT_SET_SERVER_REDIRECT}`;
             const resHandler = (res: NFResponse) => {
                 return res.text();

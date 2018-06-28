@@ -14,7 +14,7 @@ import {exp_run as user} from "./user-api";
 export module exp_run {
 
     import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
-    //import Prompt = ui.Prompt;
+
 
     export interface RangeTuple {
         0: number[],
@@ -29,6 +29,7 @@ export module exp_run {
             this.configureEventListeners();
             this.revivePreviousRange();
             this.revivePreviousSaveDir();
+            this.revivePreviousExperimentIndex();
             this.setupExpRunner();
             this.setupDetailsGetter();
             this.setupRangeGetter();
@@ -107,7 +108,7 @@ export module exp_run {
                 this.rangeFixedFirstPos = keepFirstPos;
             };
             const rangeNumbersWrapper = () => {
-                this.updateRangeNumbers();
+                this.cacheRangeNumbers();
             };
 
             this.vorpalInstance
@@ -172,11 +173,9 @@ export module exp_run {
                 this.saveDir = dir;
             };
             const saveDirWrapper = () => {
-                this.updateSaveDir();
+                this.cacheSaveDir();
             };
             const pathResolver = (args: Vorpal.Args) => {
-                //return args.directory && path.resolve(__dirname, <string>args.directory);
-                //return args.directory && expandTilde(<string>args.directory);
                 return args.directory && path.resolve(__dirname, expandTilde(<string>args.directory));
             };
 
@@ -274,7 +273,7 @@ export module exp_run {
             const userOptions: number[] = <number[]>this.fetchUserOrder();
             const orderOptions: string [] = userOptions.map((val:number, idx: number) => `${idx+1}: ${val}`);
             const noOp: () => void = () => {};
-            const selfMeta: MetaApi = this;
+            const restartIdx: number = 0;
 
             orderOptions.push(MetaApi.OPTION_VAL_RUN_EXP_FINISH);
 
@@ -287,6 +286,9 @@ export module exp_run {
                     this.expIdx = updatedVal;
                 }
             };
+            const updateCachedIndex = () : void => {
+                this.cacheExperimentIndex();
+            };
 
             function selectExperiment(): (commandCb: () => void) => void {
                 function promptInvoker(commandCb: () => void) {
@@ -297,19 +299,20 @@ export module exp_run {
                         default: orderIndexAccessor(),
                         message: MetaApi.OPTION_TITLE_RUN_EXP,
                     }, (result: { setRedirectTo: string }) => {
-                        //vI.log(`setRedirectTo: ${result.setRedirectTo}`);
 
                         const updatedOrderIdx: number = orderOptions.indexOf(result.setRedirectTo);
                         const updatedEndpoint: number = userOptions[updatedOrderIdx];
 
                         if (updatedEndpoint !== undefined) {
                             orderIndexAccessor(updatedOrderIdx);
+                            updateCachedIndex();
                             (<(self: Vorpal, args: any, cb: () => void) => void >vcWFn._fn.call)(vI, { number: updatedEndpoint }, noOp);
                             promptInvoker(commandCb);
                             vI.ui.input("");
                         } else {
                             vI.log(MetaApi.OPTION_RESULT_KEY_RUN_EXP_END);
-                            selfMeta.expIdx = 0;
+                            orderIndexAccessor(restartIdx);
+                            updateCachedIndex();
                             commandCb();
                         }
                     });
@@ -327,15 +330,12 @@ export module exp_run {
             return selectExperiment();
         }
 
-        private updateRangeNumbers(): void {
+        private cacheRangeNumbers(): void {
             (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_RANGE, [this.expRange, this.rangeFixedFirstPos]);
         }
 
         private revivePreviousRange(): void {
             const getRangeCB = (val: RangeTuple) => {
-                //const rangeData: RangeTuple | undefined =  val && JSON.parse(val);
-
-
                 if (val) {
                     this.expRange.push(...val[0]);
                     this.rangeFixedFirstPos = val[1];
@@ -345,7 +345,7 @@ export module exp_run {
            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_RANGE).then(getRangeCB);
         }
 
-        private updateSaveDir(): void {
+        private cacheSaveDir(): void {
             (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_SAVE_DIR, this.saveDir);
         }
 
@@ -355,6 +355,18 @@ export module exp_run {
             };
 
             (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_SAVE_DIR).then(saveDirCB);
+        }
+
+        private cacheExperimentIndex(): void {
+            (<VorpalWithAppdata>this.vorpalInstance).appData.setItem(MetaApi.STORAGE_KEY_EXP_INDEX, this.expIdx);
+        }
+
+        private revivePreviousExperimentIndex(): void {
+            const saveDirCB = (val: number | undefined) => {
+                this.expIdx =  <number>val || 0;
+            };
+
+            (<VorpalWithAppdata>this.vorpalInstance).appData.getItem(MetaApi.STORAGE_KEY_EXP_INDEX).then(saveDirCB);
         }
 
         private configureEventListeners(): void {
@@ -384,35 +396,37 @@ export module exp_run {
 
             return userOrder;
         }
+
+        private static readonly STORAGE_KEY_RANGE: string = "range";
+        private static readonly STORAGE_KEY_EXP_INDEX: string = "exp-index";
+        private static readonly STORAGE_KEY_SAVE_DIR: string = "save-dir";
+
         private static readonly COMMAND_NAME_GET_DETAILS: string = "get-details";
+
         private static readonly COMMAND_DESC_GET_DETAILS: string = "Gets the all the details set up in the experiment runner";
         private static readonly ACTION_DESC_GET_DETAILS: string = "Details are as follows...";
-
         private static readonly COMMAND_NAME_GET_RANGE: string = "get-range";
         private static readonly COMMAND_DESC_GET_RANGE: string = "Gets the experiment range";
+
         private static readonly ACTION_DESC_GET_RANGE: string = "Experiment range set to: ";
         private static readonly ACTION_DESC_GET_RANGE_NOT_SET: string = "Experiment range not set!";
-
         private static readonly COMMAND_NAME_SET_RANGE: string = "set-range [numbers...]";
         private static readonly COMMAND_DESC_SET_RANGE: string = "Sets the experiment range. Passing no values unsets the range.";
-        private static readonly STORAGE_KEY_RANGE: string = "range";
         private static readonly OPTION_FLAG_SET_RANGE_KEEP_FIRST_POS: string = "--keep-first, -k";
         private static readonly OPTION_DESC_SET_RANGE_KEEP_FIRST_POS: string = "Determines whether the range is expected to always have the first value fixed";
         private static readonly VALID_FAIL_DESC_SET_RANGE: string = "Cannot set the experiment range as values must be unique numbers";
         private static readonly ACTION_DESC_SET_RANGE: string = "Setting experiment range to: ";
-        private static readonly ACTION_DESC_SET_RANGE_KEEP_FIRST: string = "First item position preserved: ";
+
         private static readonly ACTION_DESC_SET_RANGE_EMPTY: string = "Unsetting experiment range";
 
         private static readonly ACTION_DESC_RANGE_KEEP_FIRST: string = "First item position preserved: ";
-
         private static readonly COMMAND_NAME_GET_SAVE_DIR: string = "get-save-dir";
         private static readonly COMMAND_DESC_GET_SAVE_DIR: string = "Gets the experiment save directory";
         private static readonly ACTION_DESC_GET_SAVE_DIR: string = "Experiment save directory set to: ";
-        private static readonly ACTION_DESC_GET_SAVE_DIR_NOT_SET: string = "Experiment save directory not set!";
 
+        private static readonly ACTION_DESC_GET_SAVE_DIR_NOT_SET: string = "Experiment save directory not set!";
         private static readonly COMMAND_NAME_SET_SAVE_DIR: string = "set-save-dir [directory]";
         private static readonly COMMAND_DESC_SET_SAVE_DIR: string = "Sets the experiment save directory, resolving it where necessary. Passing no values unsets the save directory.";
-        private static readonly STORAGE_KEY_SAVE_DIR: string = "save-dir";
         private static readonly VALID_FAIL_DESC_SET_SAVE_DIR: string = "Cannot set the save directory to non-existant folder";
         private static readonly ACTION_DESC_SET_SAVE_DIR: string = "Setting experiment save directory to: ";
         private static readonly ACTION_DESC_SET_SAVE_DIR_EMPTY: string = "Unsetting experiment save directory";

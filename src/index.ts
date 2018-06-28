@@ -1,4 +1,3 @@
-/// <reference path="../definitions/vorpal/vorpal.d.ts" />
 
 import Vorpal from 'vorpal';
 import VorpalLog from 'vorpal-log';
@@ -22,7 +21,6 @@ vorpal
     .delimiter(`${cliName}$`)
     .show()
     .log("Welcome to the test experiment runner! Type 'help' for a list of instructions to type into the console.");
-    //.parse(process.argv);
 
 const metaAPI = new meta.MetaApi(vorpal);
 const serverAPI = new server.ServerApi(vorpal);
