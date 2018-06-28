@@ -10,12 +10,10 @@ import {ExpEvents} from "./exp-events";
 import {vorpal_appdata} from "./plugins/vorpal-appdata";
 import {exp_run as server} from "./server-api";
 import {exp_run as user} from "./user-api";
-import {keys} from "node-persist";
 
 export module exp_run {
 
     import VorpalWithAppdata = vorpal_appdata.VorpalWithAppdata;
-
 
     export interface RangeTuple {
         0: number[],
@@ -270,14 +268,12 @@ export module exp_run {
                 message: MetaApi.OPTION_TITLE_RUN_EXP_SAVE_USER,
             }, (result: { save: boolean }) => {
                 if (result.save) {
-                    this.vorpalInstance.emit(ExpEvents.REQUEST_SAVE_USER);
+                    vI.emit(ExpEvents.REQUEST_SAVE_USER);
                 }
 
-                //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
+                vI.removeAllListeners(EVT_VORPAL_KEYPRESS);
 
                 next(commandCb);
-
-                //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
             });
         }
 
@@ -290,6 +286,7 @@ export module exp_run {
             const restartIdx: number = 0;
 
             orderOptions.push(MetaApi.OPTION_VAL_RUN_EXP_FINISH);
+            orderOptions.push(MetaApi.OPTION_VAL_RUN_EXP_SUSPEND);
 
             let vcWFn: VorpalCommandWithFn;
 
@@ -307,17 +304,15 @@ export module exp_run {
             function selectExperiment(): (commandCb: () => void) => void {
                 function promptInvoker(commandCb: () => void) {
 
-                    //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
-
                     vorpalCommand.prompt({
-                        type: 'rawlist',
+                        type: 'list',
                         name: MetaApi.OPTION_RESULT_KEY_RUN_EXP,
                         choices: orderOptions,
                         default: orderIndexAccessor(),
                         message: MetaApi.OPTION_TITLE_RUN_EXP_SET_REDIRECT,
                     }, (result: { setRedirectTo: string }) => {
-
-                        const updatedOrderIdx: number = orderOptions.indexOf(result.setRedirectTo);
+                        const selectedOption: string = result.setRedirectTo;
+                        const updatedOrderIdx: number = orderOptions.indexOf(selectedOption);
                         const updatedEndpoint: number = userOptions[updatedOrderIdx];
 
                         if (updatedEndpoint !== undefined) {
@@ -326,15 +321,17 @@ export module exp_run {
                             (<(self: Vorpal, args: any, cb: () => void) => void >vcWFn._fn.call)(vI, { number: updatedEndpoint }, noOp);
                             promptInvoker(commandCb);
                             vI.ui.input("");
-                        } else {
+                        } else if (selectedOption === MetaApi.OPTION_VAL_RUN_EXP_FINISH) {
                             vI.log(MetaApi.OPTION_RESULT_KEY_RUN_EXP_END);
                             orderIndexAccessor(restartIdx);
                             updateCachedIndex();
                             commandCb();
+                        } else if (selectedOption === MetaApi.OPTION_VAL_RUN_EXP_SUSPEND) {
+                            vI.log(`${MetaApi.OPTION_RESULT_KEY_RUN_EXP_SUSPEND_OPTION} ${MetaApi.OPTION_RESULT_KEY_RUN_EXP_SUSPEND}`);
+                            vI.ui.cancel();
+                            commandCb();
                         }
                     });
-
-                    //vI.on(EVT_VORPAL_KEYPRESS, meta.createCheckForExitInput(commandCb));
                 }
 
                 return (commandCb: () => void) => {
@@ -413,7 +410,7 @@ export module exp_run {
                 //console.log('checkForExitInput: ' + evt.key);
 
                 if (evt.key === EVT_VORPAL_KEYPRESS_ESC_KEY) {
-                    vI.log('Esc was pressed, exiting experiments early...');
+                    vI.log(`${MetaApi.OPTION_RESULT_KEY_RUN_EXP_SUSPEND_ESC} ${MetaApi.OPTION_RESULT_KEY_RUN_EXP_SUSPEND}`);
                     vI.removeListener(EVT_VORPAL_KEYPRESS, checkForExitInput);
                     vI.ui.cancel();
                     cb();
@@ -482,8 +479,12 @@ export module exp_run {
         private static readonly OPTION_TITLE_RUN_EXP_SAVE_USER: string = "Save current user details?";
         private static readonly OPTION_TITLE_RUN_EXP_SET_REDIRECT: string = "Set redirect to:";
         private static readonly OPTION_VAL_RUN_EXP_FINISH: string = "Complete experiments!";
+        private static readonly OPTION_VAL_RUN_EXP_SUSPEND: string = "(Suspend experiments)";
         private static readonly OPTION_RESULT_KEY_RUN_EXP: string = "setRedirectTo";
         private static readonly OPTION_RESULT_KEY_RUN_EXP_END: string = "Exiting experiment running mode...";
+        private static readonly OPTION_RESULT_KEY_RUN_EXP_SUSPEND: string = "Exiting experiments early...";
+        private static readonly OPTION_RESULT_KEY_RUN_EXP_SUSPEND_ESC: string = "Esc pressed.";
+        private static readonly OPTION_RESULT_KEY_RUN_EXP_SUSPEND_OPTION: string = "Suspend experiments selected.";
 
         private expIdx: number = 0;
         private expRange: number[] = [];
