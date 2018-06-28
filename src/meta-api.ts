@@ -10,6 +10,7 @@ import {ExpEvents} from "./exp-events";
 import {vorpal_appdata} from "./plugins/vorpal-appdata";
 import {exp_run as server} from "./server-api";
 import {exp_run as user} from "./user-api";
+import {keys} from "node-persist";
 
 export module exp_run {
 
@@ -20,6 +21,9 @@ export module exp_run {
         0: number[],
         1:boolean
     }
+
+    const EVT_VORPAL_KEYPRESS: string = 'keypress';
+    const EVT_VORPAL_KEYPRESS_ESC_KEY: string = 'escape';
 
     type VorpalCommandWithFn = Vorpal.Command & ({ _fn: () => void } | { _fn: (args: any, opts?: any) => void });
 
@@ -244,6 +248,8 @@ export module exp_run {
                     this.log(`${MetaApi.ACTION_DESC_RUN_EXP_USER_ORDER}${userOrder}`);
 
                     meta.startPrompts(this, callback);
+
+                    vI.on(EVT_VORPAL_KEYPRESS, meta.checkForExitInput);
                 });
         }
 
@@ -373,6 +379,7 @@ export module exp_run {
             const vI = this.vorpalInstance;
             this.publishDirValue = this.publishDirValue.bind(this);
             this.publishRangeValue = this.publishRangeValue.bind(this);
+            //this.checkForExitInput = this.checkForExitInput.bind(this);
 
             vI.on(ExpEvents.REQUEST_DIR, this.publishDirValue);
             vI.on(ExpEvents.REQUEST_RANGE, this.publishRangeValue);
@@ -384,6 +391,17 @@ export module exp_run {
 
         private publishRangeValue(cb: (range: number[], fixedFirstPosition: boolean) => void): void {
             cb(this.expRange, this.rangeFixedFirstPos);
+        }
+
+        private checkForExitInput(evt : { key: string, value: string, e: Event }): void {
+            this.vorpalInstance.log('checkForExitInput: ' + evt.key);
+
+            if (evt.key === EVT_VORPAL_KEYPRESS_ESC_KEY) {
+                this.vorpalInstance.log('Esc was pressed, exiting experiments early...');
+                this.vorpalInstance.log(evt);
+                //this.vorpalInstance.off(EVT_VORPAL_KEYPRESS, this.checkForExitInput);
+                this.vorpalInstance.ui.cancel();
+            }
         }
 
 
