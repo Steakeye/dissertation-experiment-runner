@@ -13,8 +13,6 @@ export module exp_run {
 
     export class BeaconApi implements API {
         public static readonly COMMAND_NAME_GET_BEACON: string = "get-beacon";
-        public static readonly COMMAND_NAME_GET_BEACON_REDIRECT: string = "get-beacon-redirect";
-        public static readonly COMMAND_NAME_SET_BEACON_REDIRECT: string = "set-beacon-redirect";
 
         constructor(private vorpalInstance: Vorpal) {
             this.configureEventListeners();
@@ -22,8 +20,6 @@ export module exp_run {
             this.setupBeaconGetter();
             this.setupBeaconSetter();
             this.setupBeaconChecker();
-            this.setupBeaconRedirectGetter();
-            this.setupBeaconRedirectSetter();
         }
 
         public get url(): string { return this.beaconUrl; }
@@ -135,88 +131,43 @@ export module exp_run {
                     }
                 });
         }
-
-        private setupBeaconRedirectGetter() {
-            const beaconRedirectGetter = () => {
-                return this.beaconRedirect;
+        
+        private setupBeaconsFinder() {
+            const beaconsGetter = () => {
+                return this.beacons;
             };
 
             this.vorpalInstance
-                .command(BeaconApi.COMMAND_NAME_GET_BEACON_REDIRECT, BeaconApi.COMMAND_DESC_GET_BEACON_REDIRECT)
+                .command(BeaconApi.COMMAND_NAME_FIND_BEACONS, BeaconApi.COMMAND_DESC_FIND_BEACONS)
                 .action(function(args, callback) {
-                    const num: number = <number>beaconRedirectGetter();
-                    const message: string = num !== null ?
-                        `${BeaconApi.ACTION_DESC_GET_BEACON_REDIRECT}${num}` :
-                        BeaconApi.ACTION_DESC_GET_BEACON_REDIRECT_NOT_SET;
+                    const url: string = beaconsGetter();
+                    const beaconsSet: boolean = !!url.length;
+                    const message: string = beaconsSet ? `${BeaconApi.ACTION_DESC_FIND_BEACONS}${url}` : BeaconApi.VALID_FAIL_DESC_FIND_BEACONS;
 
                     this.log(message);
 
-                    callback();
-                });
-        }
+                    if (url.length) {
+                        const vI: Vorpal = this.parent;
 
-        private setupBeaconRedirectSetter() {
-            const beaconSetter = (url: number | null, cb: () => void) => {
-                this.beaconRedirect = url;
-                this.requestBeaconRedirectUpdate(cb);
-            };
-            const beaconIsSet = () => {
-                return !!this.beaconUrl.length;
-            };
+                        const resHandler = (res: NFResponse) => {
+                            return `${res.status} ${res.statusText}`;
+                        };
+                        const textHandler = (text: string) => {
+                            vI.log(`${BeaconApi.RESULT_DESC_FIND_BEACONS_RESPONDED}${text}`);
+                            callback();
+                        };
+                        const errortHandler = (err: any) => {
+                            vI.log(`${BeaconApi.RESULT_DESC_FIND_BEACONS_FAILED}${err}`);
+                            callback();
+                        };
 
-            this.vorpalInstance
-                .command(BeaconApi.COMMAND_NAME_SET_BEACON_REDIRECT_WITH_ARGS, BeaconApi.COMMAND_DESC_SET_BEACON_REDIRECT)
-                .validate(function (args) {
-                    const num: number | null = <number>args.number || null;
+                        const fetchPromise: Promise<NFResponse> = fetch(url, { method: "HEAD" });
 
-                    let result: string | true;
-
-                    if (!beaconIsSet()) {
-                        result = BeaconApi.VALID_FAIL_DESC_SET_BEACON_REDIRECT_URL;
-                    } else if (!BeaconApi.isRedirectWithinRange(this.parent, <number>num) && num !== null) {
-                        result = BeaconApi.VALID_FAIL_DESC_SET_BEACON_REDIRECT_NUM;
+                        fetchPromise.then(resHandler).then(textHandler, errortHandler);
                     } else {
-                        result = true;
+                        callback();
                     }
-
-                    return result;
-                })
-                .action(function(args, callback) {
-                    const num: number = <number>args.number;
-                    const message: string = num ? `${BeaconApi.ACTION_DESC_SET_BEACON_REDIRECT}${num}` : BeaconApi.ACTION_DESC_SET_BEACON_REDIRECT_EMPTY;
-
-                    this.log(message);
-                    beaconSetter(num || null, callback);
                 });
-        }
-
-        private requestBeaconRedirectUpdate(cb: () => void): void {
-            const endpoint: string = `${this.beaconUrl}${BeaconApi.PATH_FRAGMENT_SET_BEACON_REDIRECT}`;
-            const resHandler = (res: NFResponse) => {
-                return res.text();
-            };
-            const textHandler = (text: string) => {
-                this.vorpalInstance.log(text);
-                cb();
-            };
-            const errortHandler = (err: any) => {
-                this.vorpalInstance.log(err);
-                cb();
-            };
-
-            const fetchPromise: Promise<NFResponse> = this.beaconRedirect ? fetch(`${endpoint}${this.beaconRedirect}`) : fetch(endpoint, { method: "DELETE" });
-
-            fetchPromise.then(resHandler).then(textHandler, errortHandler);
-        }
-
-        private static isRedirectWithinRange(vI: Vorpal, num: number): boolean {
-            let expRange: number[] = [];
-
-            vI.emit(ExpEvents.REQUEST_RANGE, (range: number[], isFirstPosFixed: boolean) => {
-                expRange = range;
-            });
-
-            return expRange.indexOf(num) != -1;
         }
 
         private static readonly STORAGE_KEY_CURRENT_BEACON: string = "current-beacon";
@@ -238,19 +189,14 @@ export module exp_run {
         private static readonly RESULT_DESC_CHECK_BEACON_RESPONDED: string = "Beacon responded: ";
         private static readonly RESULT_DESC_CHECK_BEACON_FAILED: string = "Beacon response: failure: ";
 
-        private static readonly COMMAND_DESC_GET_BEACON_REDIRECT: string = "Gets the beacon redirect endpoint";
-        private static readonly ACTION_DESC_GET_BEACON_REDIRECT: string = "Beacon redirect endpoint set to: ";
-        private static readonly ACTION_DESC_GET_BEACON_REDIRECT_NOT_SET: string = "Beacon redirect endpoint not set!";
+        private static readonly COMMAND_NAME_FIND_BEACONS: string = "Find-beacons";
+        private static readonly COMMAND_DESC_FIND_BEACONS: string = "Finds the beacons is responding.";
+        private static readonly VALID_FAIL_DESC_FIND_BEACONS: string = "Cannot find beacons.";
+        private static readonly ACTION_DESC_FIND_BEACONS: string = "Finding beacons: ";
+        private static readonly RESULT_DESC_FIND_BEACONS_RESPONDED: string = "Beacons responded: ";
+        private static readonly RESULT_DESC_FIND_BEACONS_FAILED: string = "Beacons response: failure: ";
 
-        private static readonly COMMAND_NAME_SET_BEACON_REDIRECT_WITH_ARGS: string = `${BeaconApi.COMMAND_NAME_SET_BEACON_REDIRECT} [number]`;
-        private static readonly PATH_FRAGMENT_SET_BEACON_REDIRECT: string = "/setredirect/";
-        private static readonly COMMAND_DESC_SET_BEACON_REDIRECT: string = "Sets the beacon redirect endpoint";
-        private static readonly VALID_FAIL_DESC_SET_BEACON_REDIRECT_URL: string = "Cannot set beacon redirect when beacon URL not set";
-        private static readonly VALID_FAIL_DESC_SET_BEACON_REDIRECT_NUM: string = "Cannot set beacon redirect to a number out of range (1-8)";
-        private static readonly ACTION_DESC_SET_BEACON_REDIRECT: string = "Setting beacon redirect endpoint to: ";
-        private static readonly ACTION_DESC_SET_BEACON_REDIRECT_EMPTY: string = "Unsetting beacon redirect endpoint";
-
+        private beacons: any;
         private beaconUrl: string = "";
-        private beaconRedirect: number | null = null;
     }
 }
