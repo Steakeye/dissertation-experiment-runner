@@ -1,11 +1,14 @@
 import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
-import * as noble from "noble";
+//import noble from "noble";
+import {Peripheral} from "noble";
 import fetch, { Response as NFResponse } from "node-fetch";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
+
+const noble = require("noble");
 
 export module exp_run {
 
@@ -19,6 +22,7 @@ export module exp_run {
             this.revivePreviousBeacon();
             this.setupBeaconGetter();
             this.setupBeaconSetter();
+            this.setupBeaconsFinder();
             this.setupBeaconChecker();
         }
 
@@ -140,7 +144,7 @@ export module exp_run {
             this.vorpalInstance
                 .command(BeaconApi.COMMAND_NAME_FIND_BEACONS, BeaconApi.COMMAND_DESC_FIND_BEACONS)
                 .action(function(args, callback) {
-                    const url: string = beaconsGetter();
+                    /*const url: string = beaconsGetter();
                     const beaconsSet: boolean = !!url.length;
                     const message: string = beaconsSet ? `${BeaconApi.ACTION_DESC_FIND_BEACONS}${url}` : BeaconApi.VALID_FAIL_DESC_FIND_BEACONS;
 
@@ -166,7 +170,29 @@ export module exp_run {
                         fetchPromise.then(resHandler).then(textHandler, errortHandler);
                     } else {
                         callback();
-                    }
+                    }*/
+                    const vI: Vorpal = this.parent;
+
+                    noble.on('scanStart', () => {
+                        vI.log("scanning started");
+                    });
+
+                    noble.on('scanStop', () => {
+                        vI.log("scanning stopped");
+                    });
+
+                    vI.log("startScanning");
+                    noble.startScanning();
+
+                    noble.on('discover', (peripheral: Peripheral) => {
+                        vI.log("discover: ", peripheral);
+                    });
+
+                    setTimeout(() => {
+                        vI.log("stopScanning");
+                        noble.stopScanning();
+                        callback();
+                    }, 5000);
                 });
         }
 
@@ -189,7 +215,7 @@ export module exp_run {
         private static readonly RESULT_DESC_CHECK_BEACON_RESPONDED: string = "Beacon responded: ";
         private static readonly RESULT_DESC_CHECK_BEACON_FAILED: string = "Beacon response: failure: ";
 
-        private static readonly COMMAND_NAME_FIND_BEACONS: string = "Find-beacons";
+        private static readonly COMMAND_NAME_FIND_BEACONS: string = "find-beacons";
         private static readonly COMMAND_DESC_FIND_BEACONS: string = "Finds the beacons is responding.";
         private static readonly VALID_FAIL_DESC_FIND_BEACONS: string = "Cannot find beacons.";
         private static readonly ACTION_DESC_FIND_BEACONS: string = "Finding beacons: ";
