@@ -3,6 +3,7 @@ import Vorpal from 'vorpal';
 import VorpalLog from 'vorpal-log';
 import { vorpal_appdata as appData } from "./plugins/vorpal-appdata";
 import { exp_run as server } from "./server-api";
+import { exp_run as beacon } from "./beacon-api";
 import { exp_run as user } from "./user-api";
 import { exp_run as meta } from "./meta-api";
 
@@ -24,6 +25,7 @@ vorpal
 
 const metaAPI = new meta.MetaApi(vorpal);
 const serverAPI = new server.ServerApi(vorpal);
+const beaconAPI = new beacon.BeaconApi(vorpal);
 const userAPI = new user.UserApi(vorpal);
 
-vorpal.parse(process.argv)
+vorpal.parse(process.argv);

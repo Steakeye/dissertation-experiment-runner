@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
-import range from "lodash/range";
+import * as noble from "noble";
 import fetch, { Response as NFResponse } from "node-fetch";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
