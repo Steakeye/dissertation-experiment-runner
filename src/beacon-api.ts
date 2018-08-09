@@ -1,9 +1,12 @@
 import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
-//import noble from "noble";
 import {Peripheral} from "noble";
+import Table from "cli-table";
 import fetch, { Response as NFResponse } from "node-fetch";
+import every from "lodash/every";
+import isNum from "lodash/isNumber";
+import getUniq from "lodash/uniq";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
@@ -141,37 +144,31 @@ export module exp_run {
                 return this.beacons;
             };
 
+            const beacons: Peripheral[] = this.beacons;
+
             this.vorpalInstance
                 .command(BeaconApi.COMMAND_NAME_FIND_BEACONS, BeaconApi.COMMAND_DESC_FIND_BEACONS)
-                .action(function(args, callback) {
-                    /*const url: string = beaconsGetter();
-                    const beaconsSet: boolean = !!url.length;
-                    const message: string = beaconsSet ? `${BeaconApi.ACTION_DESC_FIND_BEACONS}${url}` : BeaconApi.VALID_FAIL_DESC_FIND_BEACONS;
+                .validate(function(args) {
+                    const time: number | null = <number>args.search_time || null;
 
-                    this.log(message);
+                    let result: string | true;
 
-                    if (url.length) {
-                        const vI: Vorpal = this.parent;
-
-                        const resHandler = (res: NFResponse) => {
-                            return `${res.status} ${res.statusText}`;
-                        };
-                        const textHandler = (text: string) => {
-                            vI.log(`${BeaconApi.RESULT_DESC_FIND_BEACONS_RESPONDED}${text}`);
-                            callback();
-                        };
-                        const errortHandler = (err: any) => {
-                            vI.log(`${BeaconApi.RESULT_DESC_FIND_BEACONS_FAILED}${err}`);
-                            callback();
-                        };
-
-                        const fetchPromise: Promise<NFResponse> = fetch(url, { method: "HEAD" });
-
-                        fetchPromise.then(resHandler).then(textHandler, errortHandler);
+                    if (time === null) {
+                        result = BeaconApi.VALID_FAIL_DESC_NO_SEARCH_TIME;
+                    } else if (isNum(time)) {
+                        result = true;
                     } else {
-                        callback();
-                    }*/
+                        result = BeaconApi.VALID_FAIL_DESC_NON_NUM_SEARCH_TIME;
+                    }
+
+                    return <string | true>result;
+                })
+                .action(function(args, callback) {
                     const vI: Vorpal = this.parent;
+
+                    beacons.length = 0;
+
+                    vI.log(`Scanning for beacons for ${args.search_time} milliseconds`);
 
                     noble.on('scanStart', () => {
                         vI.log("scanning started");
@@ -185,14 +182,15 @@ export module exp_run {
                     noble.startScanning();
 
                     noble.on('discover', (peripheral: Peripheral) => {
-                        vI.log("discover: ", peripheral);
+                        vI.log("Discovered peripheral: ", peripheral.advertisement.localName, peripheral.id, peripheral.address);
+                        beacons.push(peripheral);
                     });
 
                     setTimeout(() => {
                         vI.log("stopScanning");
                         noble.stopScanning();
                         callback();
-                    }, 5000);
+                    }, args.search_time);
                 });
         }
 
@@ -215,14 +213,16 @@ export module exp_run {
         private static readonly RESULT_DESC_CHECK_BEACON_RESPONDED: string = "Beacon responded: ";
         private static readonly RESULT_DESC_CHECK_BEACON_FAILED: string = "Beacon response: failure: ";
 
-        private static readonly COMMAND_NAME_FIND_BEACONS: string = "find-beacons";
-        private static readonly COMMAND_DESC_FIND_BEACONS: string = "Finds the beacons is responding.";
+        private static readonly COMMAND_NAME_FIND_BEACONS: string = "find-beacons <search_time>";
+        private static readonly COMMAND_DESC_FIND_BEACONS: string = "Finds any BLE beacons advertising (broadcasting). <search_time> sets how long you wish to scan for devices (in milliseconds).";
+        private static readonly VALID_FAIL_DESC_NO_SEARCH_TIME: string = "<search_time> not set. Please set how long you wish to scan for devices.";
+        private static readonly VALID_FAIL_DESC_NON_NUM_SEARCH_TIME: string = "<search_time> is not a number. Please enter a numeric value.";
         private static readonly VALID_FAIL_DESC_FIND_BEACONS: string = "Cannot find beacons.";
         private static readonly ACTION_DESC_FIND_BEACONS: string = "Finding beacons: ";
         private static readonly RESULT_DESC_FIND_BEACONS_RESPONDED: string = "Beacons responded: ";
         private static readonly RESULT_DESC_FIND_BEACONS_FAILED: string = "Beacons response: failure: ";
 
-        private beacons: any;
+        private beacons: Peripheral[] = [];
         private beaconUrl: string = "";
     }
 }
