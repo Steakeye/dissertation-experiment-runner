@@ -4,9 +4,8 @@ import {isURL} from "validator";
 import {Peripheral} from "noble";
 import Table from "cli-table";
 import fetch, { Response as NFResponse } from "node-fetch";
-import every from "lodash/every";
+import some from "lodash/some";
 import isNum from "lodash/isNumber";
-import getUniq from "lodash/uniq";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
@@ -176,20 +175,40 @@ export module exp_run {
 
                     noble.on('scanStop', () => {
                         vI.log("scanning stopped");
+
+                        if (!beacons.length) {
+                            vI.log(BeaconApi.VALID_FAIL_DESC_FIND_BEACONS);
+                        } else {
+                            const summary: Table = new Table({
+                                head: ["Name", "ID", "Address", "Address Type"],
+                                colWidths: [20, 20, 20, 20]
+                            });
+
+                            vI.log("\nDiscovery summary:");
+                            summary.push(beacons.map((beacon) => [beacon.advertisement.localName, beacon.id, beacon.address, beacon.addressType]));
+
+                            vI.log(summary.toString());
+                        }
+
+                        callback();
                     });
 
                     vI.log("startScanning");
                     noble.startScanning();
 
                     noble.on('discover', (peripheral: Peripheral) => {
-                        vI.log("Discovered peripheral: ", peripheral.advertisement.localName, peripheral.id, peripheral.address);
-                        beacons.push(peripheral);
+                        vI.log("Discovered peripheral: ", peripheral.advertisement.localName, peripheral.id, peripheral.address, peripheral.addressType);
+
+                        const existingPeripheral: boolean = some(beacons, { id: peripheral.id, address: peripheral.address, "advertisement.localName": peripheral.advertisement.localName });
+
+                        if (!existingPeripheral) {
+                            beacons.push(peripheral);
+                        }
                     });
 
                     setTimeout(() => {
                         vI.log("stopScanning");
                         noble.stopScanning();
-                        callback();
                     }, args.search_time);
                 });
         }
