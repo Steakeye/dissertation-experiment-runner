@@ -29,6 +29,7 @@
     "@types/node-persist": "0.0.33",
     "@types/random-seed": "^0.3.3",
     "@types/request": "^2.47.1",
+    "@types/stringify-object": "^3.2.0",
     "@types/validator": "^9.4.1",
     "typescript": "^2.9.2"
   },
@@ -46,6 +47,7 @@
     "node-fetch": "^2.1.2",
     "node-persist": "^3.0.1",
     "random-seed": "^0.3.0",
+    "stringify-object": "^3.2.2",
     "tty-table": "^2.6.8",
     "validator": "^10.4.0",
     "vorpal": "^1.12.0",

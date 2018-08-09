@@ -111,7 +111,7 @@ export module exp_run {
                     if (hasUserNums) {
                         this.log(`${UserApi.ACTION_DESC_GET_USER_ORDER}${userNums}`);
                     } else {
-                        (<CommandInstance & { warn(msg: string): void }>this).warn(UserApi.ACTION_DESC_GET_USER_ORDER_NOT_SET);
+                        this.log(UserApi.ACTION_DESC_GET_USER_ORDER_NOT_SET);
                     }
 
                     callback();

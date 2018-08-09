@@ -1,11 +1,10 @@
-import Vorpal from "vorpal";
+import Vorpal, {Args} from "vorpal";
 import {isURL} from "validator";
 import {Characteristic, Peripheral, Service} from "noble";
 import {Cell} from "cli-table2";
-import fetch, { Response as NFResponse } from "node-fetch";
-import some from "lodash/some";
 import isNum from "lodash/isNumber";
 import find from "lodash/find";
+import some from "lodash/some";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
@@ -13,6 +12,7 @@ import {isString} from "util";
 
 const noble = require("noble");
 const Table = require('tty-table')('automattic-cli-table');
+const stringifyObject = require('stringify-object');
 
 export module exp_run {
 
@@ -28,6 +28,7 @@ export module exp_run {
             this.setupBeaconSetter();
             this.setupBeaconConnect();
             this.setupBeaconDisconnect();
+            this.setupBeaconReadService();
             //this.setupBeaconChecker();
         }
 
@@ -240,8 +241,6 @@ export module exp_run {
                 return this.currentBeacon;
             };
 
-            const beacons: Peripheral[] = this.beacons;
-
             this.vorpalInstance
                 .command(BeaconApi.COMMAND_NAME_DISCONNECT_BEACON, BeaconApi.COMMAND_DESC_DISCONNECT_BEACON)
                 .validate(function(args) {
@@ -282,6 +281,106 @@ export module exp_run {
                 });
         }
 
+        private setupBeaconReadData() {
+            const beaconsGetter = () => {
+                return this.currentBeacon;
+            };
+
+            this.vorpalInstance
+                .command(BeaconApi.COMMAND_NAME_READ_BEACON, BeaconApi.COMMAND_DESC_READ_BEACON)
+                .validate(function(args) {
+                    const currentBeacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    let result: string | true;
+
+                    if (!currentBeacon) {
+                        result = BeaconApi.VALID_FAIL_DESC_READ_BEACON;
+                    } else {
+                        result = true
+                    }
+
+                    return <string | true>result;
+                })
+                .action(function(args, callback) {
+                    const vI: Vorpal = this.parent;
+
+                    const beacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    vI.log(`Attempting to read from ${beacon.advertisement.localName} ${beacon.id}`);
+
+                    let readResultReported: boolean = false;
+
+                    const readCallback = (error: string, data: Buffer) => {
+                        if (readResultReported) return;
+
+                        readResultReported = true;
+
+                        if (error) {
+                            vI.log(error);
+                        } else {
+                            vI.log("Read succeeded\n--------------\n", data.toString());
+                        }
+
+                        callback();
+                    };
+
+                    beacon.readHandle(new Buffer(17), readCallback);
+
+                    beacon.on("read", readCallback);
+                });
+        }
+        
+        private setupBeaconReadService() {
+            const beaconsGetter = () => {
+                return this.currentBeacon;
+            };
+
+            this.vorpalInstance
+                .command(BeaconApi.COMMAND_NAME_READ_SERVICE_BEACON, BeaconApi.COMMAND_DESC_READ_SERVICE_BEACON)
+                .validate(function(args) {
+                    const currentBeacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    let result: string | true;
+
+                    if (!currentBeacon) {
+                        result = BeaconApi.VALID_FAIL_DESC_READ_SERVICE_BEACON;
+                    } else if (!args.service_uuid) {
+                        result = BeaconApi.VALID_FAIL_DESC_READ_SERVICE_BEACON_UUID;
+                    } else {
+                        result = true
+                    }
+
+                    return <string | true>result;
+                })
+                .action(function(args, callback) {
+                    const vI: Vorpal = this.parent;
+
+                    const beacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    vI.log(`Attempting to read from ${beacon.advertisement.localName} ${beacon.id}`);
+
+                    let readResultReported: boolean = false;
+
+                    const readCallback = (error: string, data: Buffer) => {
+                        if (readResultReported) return;
+
+                        readResultReported = true;
+
+                        if (error) {
+                            vI.log(error);
+                        } else {
+                            vI.log("Read Service succeeded\n--------------\n", data.toString());
+                        }
+
+                        callback();
+                    };
+
+                    beacon.readHandle(new Buffer(17), readCallback);
+
+                    beacon.on("read", readCallback);
+                });
+        }
+
         private setupBeaconInfoGetter() {
             const beacons: Peripheral[] = this.beacons;
 
@@ -317,7 +416,7 @@ export module exp_run {
                         if (beacon) {
                             const nobleExtra = (<any>beacon)._noble;
                             delete (<any>beacon)._noble;
-                            vI.log("Beacon data\n-----------\n", beacon);
+                            vI.log("Beacon data\n-----------\n", stringifyObject(beacon));
                             (<any>beacon)._noble = nobleExtra;
                             if (args.options["extra"]) {
                                 callCallbacAfterAsyncCall = true;
@@ -358,12 +457,21 @@ export module exp_run {
 
         private static readonly COMMAND_NAME_CONNECT_BEACON: string = "connect-current-beacon";
         private static readonly COMMAND_DESC_CONNECT_BEACON: string = "Connects the beacon to operate on.";
-        private static readonly VALID_FAIL_DESC_CONNECT_BEACON: string = "Cannot connect beacon as no current set";
+        private static readonly VALID_FAIL_DESC_CONNECT_BEACON: string = "Cannot connect beacon as no current beacon set";
         
         private static readonly COMMAND_NAME_DISCONNECT_BEACON: string = "disconnect-current-beacon";
-        private static readonly COMMAND_DESC_DISCONNECT_BEACON: string = "Disconnects the beacon to operate on.";
-        private static readonly VALID_FAIL_DESC_DISCONNECT_BEACON: string = "Cannot disconnect beacon as no current set";
+        private static readonly COMMAND_DESC_DISCONNECT_BEACON: string = "Disconnects the current beacon.";
+        private static readonly VALID_FAIL_DESC_DISCONNECT_BEACON: string = "Cannot disconnect beacon as no current beacon set";
         
+        private static readonly COMMAND_NAME_READ_BEACON: string = "read-current-beacon";
+        private static readonly COMMAND_DESC_READ_BEACON: string = "Reads the data of the current beacon.";
+        private static readonly VALID_FAIL_DESC_READ_BEACON: string = "Cannot read beacon as no current beacon set";
+        
+        private static readonly COMMAND_NAME_READ_SERVICE_BEACON: string = "read-current-beacon-service <service_uuid>";
+        private static readonly COMMAND_DESC_READ_SERVICE_BEACON: string = "Read Services data of the current beacon.";
+        private static readonly VALID_FAIL_DESC_READ_SERVICE_BEACON: string = "Cannot read beacon Service as no current beacon set";
+        private static readonly VALID_FAIL_DESC_READ_SERVICE_BEACON_UUID: string = "Cannot read beacon Service as no UUID provided";
+
         private static readonly COMMAND_NAME_FIND_BEACONS: string = "find-beacons <search_time>";
         private static readonly COMMAND_DESC_FIND_BEACONS: string = "Finds any BLE beacons advertising (broadcasting). <search_time> sets how long you wish to scan for devices (in milliseconds).";
         private static readonly VALID_FAIL_DESC_NO_SEARCH_TIME: string = "<search_time> not set. Please set how long you wish to scan for devices.";
