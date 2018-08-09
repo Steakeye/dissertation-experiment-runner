@@ -2,7 +2,8 @@ import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
 import {Peripheral} from "noble";
-import Table from "cli-table";
+//import CliTable2 from "cli-table2";
+import {Cell} from "cli-table2";
 import fetch, { Response as NFResponse } from "node-fetch";
 import some from "lodash/some";
 import isNum from "lodash/isNumber";
@@ -11,10 +12,13 @@ import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
 
 const noble = require("noble");
+const Table = require('tty-table')('automattic-cli-table');
 
 export module exp_run {
 
     import VorpalWithAppdate = vorpal_appdata.VorpalWithAppdata;
+
+    //import Table = CliTable2;
 
     export class BeaconApi implements API {
         public static readonly COMMAND_NAME_GET_BEACON: string = "get-beacon";
@@ -165,27 +169,41 @@ export module exp_run {
                 .action(function(args, callback) {
                     const vI: Vorpal = this.parent;
 
+                    let startCalled: boolean = false;
+                    let stoppedCalled: boolean = false;
+
                     beacons.length = 0;
 
                     vI.log(`Scanning for beacons for ${args.search_time} milliseconds`);
 
                     noble.on('scanStart', () => {
+                        if (startCalled) return;
+
+                        startCalled = true;
+
                         vI.log("scanning started");
                     });
 
                     noble.on('scanStop', () => {
+                        if (stoppedCalled) return;
+
+                        stoppedCalled = true;
+
                         vI.log("scanning stopped");
 
                         if (!beacons.length) {
                             vI.log(BeaconApi.VALID_FAIL_DESC_FIND_BEACONS);
                         } else {
-                            const summary: Table = new Table({
+                            const summary = new Table({
                                 head: ["Name", "ID", "Address", "Address Type"],
                                 colWidths: [20, 20, 20, 20]
                             });
 
                             vI.log("\nDiscovery summary:");
-                            summary.push(beacons.map((beacon) => [beacon.advertisement.localName, beacon.id, beacon.address, beacon.addressType]));
+                            //summary.push(beacons.map((beacon) => [beacon.advertisement.localName.replace("\0", ''), beacon.id, beacon.address, beacon.addressType]));
+                            const row: Cell[][] = beacons.map((beacon) => [beacon.advertisement.localName ? beacon.advertisement.localName.replace(/\0/g, ''): ""+beacon.advertisement.localName, beacon.id, beacon.address, beacon.addressType])
+                            // @ts-ignore
+                            summary.push(...row);
 
                             vI.log(summary.toString());
                         }
@@ -197,11 +215,11 @@ export module exp_run {
                     noble.startScanning();
 
                     noble.on('discover', (peripheral: Peripheral) => {
-                        vI.log("Discovered peripheral: ", peripheral.advertisement.localName, peripheral.id, peripheral.address, peripheral.addressType);
-
-                        const existingPeripheral: boolean = some(beacons, { id: peripheral.id, address: peripheral.address, "advertisement.localName": peripheral.advertisement.localName });
+                        //const existingPeripheral: boolean = some(beacons, { id: peripheral.id, address: peripheral.address, "advertisement.localName": peripheral.advertisement.localName });
+                        const existingPeripheral: boolean = some(beacons, { id: peripheral.id });
 
                         if (!existingPeripheral) {
+                            vI.log("Discovered peripheral: ", peripheral.advertisement.localName, peripheral.id, peripheral.address, peripheral.addressType);
                             beacons.push(peripheral);
                         }
                     });
