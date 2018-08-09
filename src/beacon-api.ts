@@ -1,15 +1,15 @@
-import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
-import {Peripheral} from "noble";
-//import CliTable2 from "cli-table2";
+import {Characteristic, Peripheral, Service} from "noble";
 import {Cell} from "cli-table2";
 import fetch, { Response as NFResponse } from "node-fetch";
 import some from "lodash/some";
 import isNum from "lodash/isNumber";
+import find from "lodash/find";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
+import {isString} from "util";
 
 const noble = require("noble");
 const Table = require('tty-table')('automattic-cli-table');
@@ -21,49 +21,28 @@ export module exp_run {
     //import Table = CliTable2;
 
     export class BeaconApi implements API {
-        public static readonly COMMAND_NAME_GET_BEACON: string = "get-beacon";
-
         constructor(private vorpalInstance: Vorpal) {
-            this.configureEventListeners();
-            this.revivePreviousBeacon();
+            this.setupBeaconsFinder();
+            this.setupBeaconInfoGetter();
             this.setupBeaconGetter();
             this.setupBeaconSetter();
-            this.setupBeaconsFinder();
-            this.setupBeaconChecker();
-        }
-
-        public get url(): string { return this.beaconUrl; }
-
-        private configureEventListeners(): void {
-            const vI = this.vorpalInstance;
-
-            this.onRequestBeacon = this.onRequestBeacon.bind(this);
-
-            vI.on(ExpEvents.REQUEST_BEACON, this.onRequestBeacon);
-        }
-
-        private onRequestBeacon(cb: (url: string | null) => void) : void {
-            cb(this.beaconUrl || null);
-        }
-
-        private revivePreviousBeacon(): void {
-            const getBeaconCB = (val: string) => {
-                this.beaconUrl = val || "";
-            };
-
-            (<VorpalWithAppdate>this.vorpalInstance).appData.getItem(BeaconApi.STORAGE_KEY_CURRENT_BEACON).then(getBeaconCB);
+            this.setupBeaconConnect();
+            this.setupBeaconDisconnect();
+            //this.setupBeaconChecker();
         }
 
         private setupBeaconGetter() {
             const beaconGetter = () => {
-                return this.beaconUrl;
+                return this.currentBeacon;
             };
 
             this.vorpalInstance
                 .command(BeaconApi.COMMAND_NAME_GET_BEACON, BeaconApi.COMMAND_DESC_GET_BEACON)
                 .action(function(args, callback) {
-                    const url: string = beaconGetter();
-                    const message: string = url.length ? `${BeaconApi.ACTION_DESC_GET_BEACON}${url}` : BeaconApi.ACTION_DESC_GET_BEACON_NOT_SET;
+                    const currentBeacon: Peripheral = <Peripheral>beaconGetter();
+                    const message: string = currentBeacon ? 
+                        `${BeaconApi.ACTION_DESC_GET_BEACON}${currentBeacon.advertisement.localName} ${currentBeacon.advertisement.localName} ${currentBeacon.id}` : 
+                        BeaconApi.ACTION_DESC_GET_BEACON_NOT_SET;
 
                     this.log(message);
 
@@ -72,73 +51,47 @@ export module exp_run {
         }
 
         private setupBeaconSetter() {
-            const beaconSetter = (url: string) => {
-                this.beaconUrl = url;
-                (<VorpalWithAppdate>this.vorpalInstance).appData.setItem(BeaconApi.STORAGE_KEY_CURRENT_BEACON, url);
+            const beaconSetter = (beacon: Peripheral) => {
+                this.currentBeacon = beacon;
             };
+
+            const beacons: Peripheral[] = this.beacons;
 
             this.vorpalInstance
                 .command(BeaconApi.COMMAND_NAME_SET_BEACON, BeaconApi.COMMAND_DESC_SET_BEACON)
-                .validate(function (args) {
-                    const url: string | null = <string>args.url || null;
+                .validate(function(args) {
+                    const id: number | null = <number>args.beacon_id || null;
 
                     let result: string | true;
 
-                    if (url === null || isURL(<string>url, { require_tld: false })) {
-                        result = true;
+                    if (id === null) {
+                        result = "No beacon_id provided";
+                    } else if (!isString(id)) {
+                        result = "beacon_id is not a string, please enter correct beacon_id";
                     } else {
-                        result = BeaconApi.VALID_FAIL_DESC_SET_BEACON_URL;
+                        result = true;
                     }
 
-                    return result;
+                    return <string | true>result;
                 })
                 .action(function(args, callback) {
-                    const url: string = <string>args.url;
-                    const message: string = url ? `${BeaconApi.ACTION_DESC_SET_BEACON}${url}` : BeaconApi.ACTION_DESC_SET_BEACON_EMPTY;
+                    const vI: Vorpal = this.parent;
 
-                    this.log(message);
-                    beaconSetter(url || '');
+                    if (!beacons.length) {
+                        vI.log("No beacons found, please scan for beacons first.");
+
+                    } else {
+                        const beacon: Peripheral = <Peripheral>find(beacons, ["id", args.beacon_id ]);
+
+                        if (beacon) {
+                            beaconSetter(beacon);
+                           vI.log(`${BeaconApi.ACTION_DESC_SET_BEACON}${beacon.advertisement.localName} ${args.beacon_id}`);
+                        } else {
+                            vI.log(`${BeaconApi.VALID_FAIL_DESC_SET_BEACON}`);
+                        }
+                    }
 
                     callback();
-                });
-        }
-
-
-        private setupBeaconChecker() {
-            const beaconGetter = () => {
-                return this.beaconUrl;
-            };
-
-            this.vorpalInstance
-                .command(BeaconApi.COMMAND_NAME_CHECK_BEACON, BeaconApi.COMMAND_DESC_CHECK_BEACON)
-                .action(function(args, callback) {
-                    const url: string = beaconGetter();
-                    const beaconSet: boolean = !!url.length;
-                    const message: string = beaconSet ? `${BeaconApi.ACTION_DESC_CHECK_BEACON}${url}` : BeaconApi.VALID_FAIL_DESC_CHECK_BEACON_URL;
-
-                    this.log(message);
-
-                    if (url.length) {
-                        const vI: Vorpal = this.parent;
-
-                        const resHandler = (res: NFResponse) => {
-                            return `${res.status} ${res.statusText}`;
-                        };
-                        const textHandler = (text: string) => {
-                            vI.log(`${BeaconApi.RESULT_DESC_CHECK_BEACON_RESPONDED}${text}`);
-                            callback();
-                        };
-                        const errortHandler = (err: any) => {
-                            vI.log(`${BeaconApi.RESULT_DESC_CHECK_BEACON_FAILED}${err}`);
-                            callback();
-                        };
-
-                        const fetchPromise: Promise<NFResponse> = fetch(url, { method: "HEAD" });
-
-                        fetchPromise.then(resHandler).then(textHandler, errortHandler);
-                    } else {
-                        callback();
-                    }
                 });
         }
         
@@ -230,26 +183,187 @@ export module exp_run {
                     }, args.search_time);
                 });
         }
+        
+        private setupBeaconConnect() {
+            const beaconsGetter = () => {
+                return this.currentBeacon;
+            };
 
-        private static readonly STORAGE_KEY_CURRENT_BEACON: string = "current-beacon";
+            const beacons: Peripheral[] = this.beacons;
 
-        private static readonly COMMAND_DESC_GET_BEACON: string = "Gets the current beacon URL";
-        private static readonly ACTION_DESC_GET_BEACON: string = "Beacon URL set to: ";
-        private static readonly ACTION_DESC_GET_BEACON_NOT_SET: string = "Beacon URL not set!";
+            this.vorpalInstance
+                .command(BeaconApi.COMMAND_NAME_CONNECT_BEACON, BeaconApi.COMMAND_DESC_CONNECT_BEACON)
+                .validate(function(args) {
+                    const currentBeacon: Peripheral = <Peripheral>beaconsGetter();
 
-        private static readonly COMMAND_NAME_SET_BEACON: string = "set-beacon [url]";
-        private static readonly COMMAND_DESC_SET_BEACON: string = "Sets the beacon URL. Passing no value unsets the beacon URL.";
-        private static readonly VALID_FAIL_DESC_SET_BEACON_URL: string = "Cannot set beacon URL to invalid URL";
-        private static readonly ACTION_DESC_SET_BEACON: string = "Setting beacon URL to: ";
-        private static readonly ACTION_DESC_SET_BEACON_EMPTY: string = "Unsetting beacon URL";
+                    let result: string | true;
 
-        private static readonly COMMAND_NAME_CHECK_BEACON: string = "check-beacon";
-        private static readonly COMMAND_DESC_CHECK_BEACON: string = "Checks the beacon is responding.";
-        private static readonly VALID_FAIL_DESC_CHECK_BEACON_URL: string = "Cannot check beacon as beacon URL not set";
-        private static readonly ACTION_DESC_CHECK_BEACON: string = "Checking beacon: ";
-        private static readonly RESULT_DESC_CHECK_BEACON_RESPONDED: string = "Beacon responded: ";
-        private static readonly RESULT_DESC_CHECK_BEACON_FAILED: string = "Beacon response: failure: ";
+                    if (!currentBeacon) {
+                        result = BeaconApi.VALID_FAIL_DESC_CONNECT_BEACON;
+                    } else {
+                        result = true
+                    }
 
+                    return <string | true>result;
+                })
+                .action(function(args, callback) {
+                    const vI: Vorpal = this.parent;
+
+                    const beacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    vI.log(`Attempting to connect to ${beacon.advertisement.localName} ${beacon.id}`);
+
+                    let connectionResultReported: boolean = false;
+
+                    const connectCallback = (err: string) => {
+                        if (connectionResultReported) return;
+
+                        connectionResultReported = true;
+
+                        if (err) {
+                            vI.log(err);
+                        } else {
+                            vI.log("Connection succeeded");
+                        }
+
+                        callback();
+                    };
+
+                    beacon.connect(connectCallback);
+
+                    beacon.on("connect", connectCallback);
+                });
+        }
+        
+        private setupBeaconDisconnect() {
+            const beaconsGetter = () => {
+                return this.currentBeacon;
+            };
+
+            const beacons: Peripheral[] = this.beacons;
+
+            this.vorpalInstance
+                .command(BeaconApi.COMMAND_NAME_DISCONNECT_BEACON, BeaconApi.COMMAND_DESC_DISCONNECT_BEACON)
+                .validate(function(args) {
+                    const currentBeacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    let result: string | true;
+
+                    if (!currentBeacon) {
+                        result = BeaconApi.VALID_FAIL_DESC_DISCONNECT_BEACON;
+                    } else {
+                        result = true
+                    }
+
+                    return <string | true>result;
+                })
+                .action(function(args, callback) {
+                    const vI: Vorpal = this.parent;
+
+                    const beacon: Peripheral = <Peripheral>beaconsGetter();
+
+                    vI.log(`Attempting to disconnect to ${beacon.advertisement.localName} ${beacon.id}`);
+
+                    let disconnectionResultReported: boolean = false;
+
+                    const disconnectCallback = () => {
+                        if (disconnectionResultReported) return;
+
+                        disconnectionResultReported = true;
+
+                        vI.log("Disconnection succeeded");
+
+                        callback();
+                    };
+
+                    beacon.disconnect(disconnectCallback);
+
+                    beacon.on("disconnect", disconnectCallback);
+                });
+        }
+
+        private setupBeaconInfoGetter() {
+            const beacons: Peripheral[] = this.beacons;
+
+            this.vorpalInstance
+                .command("get-beacon-info <beacon_id>", "Returns the full data object for the beacon.")
+                .validate(function(args) {
+                    const id: number | null = <number>args.beacon_id || null;
+
+                    let result: string | true;
+
+                    if (id === null) {
+                        result = "No beacon_id provided";
+                    } else if (!isString(id)) {
+                        result = "beacon_id is not a string, please enter correct beacon_id";
+                    } else {
+                        result = true;
+                    }
+
+                    return <string | true>result;
+                })
+                .option('-e, --extra', 'Get extra info.')
+                .action(function(args, callback) {
+                    const vI: Vorpal = this.parent;
+
+                    let callCallbacAfterAsyncCall: boolean = false;
+
+                    if (!beacons.length) {
+                        vI.log("No beacons found, please scan for beacons first.");
+
+                    } else {
+                        const beacon: Peripheral = <Peripheral>find(beacons, ["id", args.beacon_id ]);
+
+                        if (beacon) {
+                            const nobleExtra = (<any>beacon)._noble;
+                            delete (<any>beacon)._noble;
+                            vI.log("Beacon data\n-----------\n", beacon);
+                            (<any>beacon)._noble = nobleExtra;
+                            if (args.options["extra"]) {
+                                callCallbacAfterAsyncCall = true;
+
+                                vI.log("\n-----------\nBeacon extra data\n-----------\n");
+                                beacon.discoverAllServicesAndCharacteristics((error: string, services: Service[], characteristics: Characteristic[]) => {
+                                    if (error) {
+                                        vI.log(error);
+                                    } else {
+                                        vI.log("Services\n--------\n", services.join("\n"));
+                                        vI.log("\n");
+                                        vI.log("Characteristics\n---------------\n", characteristics.join("\n"));
+                                    }
+                                    callback();
+                                })
+                            }
+
+                        } else {
+                            vI.log("No beacon found with that beacon_id");
+                        }
+                    }
+
+                    if (!callCallbacAfterAsyncCall) {
+                        callback()
+                    }
+                });
+        }
+
+        private static readonly COMMAND_NAME_GET_BEACON: string = "get-current-beacon";
+        private static readonly COMMAND_DESC_GET_BEACON: string = "Gets the current beacon summary data";
+        private static readonly ACTION_DESC_GET_BEACON: string = "Current Beacon set to: ";
+        private static readonly ACTION_DESC_GET_BEACON_NOT_SET: string = "Current Beacon not set!";
+
+        private static readonly COMMAND_NAME_SET_BEACON: string = "set-current-beacon <beacon_id>";
+        private static readonly COMMAND_DESC_SET_BEACON: string = "Sets the beacon to operate on.";
+        private static readonly VALID_FAIL_DESC_SET_BEACON: string = "Cannot set beacon as beacon not in list of found beacons";
+        private static readonly ACTION_DESC_SET_BEACON: string = "Setting beacon: ";
+
+        private static readonly COMMAND_NAME_CONNECT_BEACON: string = "connect-current-beacon";
+        private static readonly COMMAND_DESC_CONNECT_BEACON: string = "Connects the beacon to operate on.";
+        private static readonly VALID_FAIL_DESC_CONNECT_BEACON: string = "Cannot connect beacon as no current set";
+        
+        private static readonly COMMAND_NAME_DISCONNECT_BEACON: string = "disconnect-current-beacon";
+        private static readonly COMMAND_DESC_DISCONNECT_BEACON: string = "Disconnects the beacon to operate on.";
+        private static readonly VALID_FAIL_DESC_DISCONNECT_BEACON: string = "Cannot disconnect beacon as no current set";
+        
         private static readonly COMMAND_NAME_FIND_BEACONS: string = "find-beacons <search_time>";
         private static readonly COMMAND_DESC_FIND_BEACONS: string = "Finds any BLE beacons advertising (broadcasting). <search_time> sets how long you wish to scan for devices (in milliseconds).";
         private static readonly VALID_FAIL_DESC_NO_SEARCH_TIME: string = "<search_time> not set. Please set how long you wish to scan for devices.";
@@ -260,6 +374,6 @@ export module exp_run {
         private static readonly RESULT_DESC_FIND_BEACONS_FAILED: string = "Beacons response: failure: ";
 
         private beacons: Peripheral[] = [];
-        private beaconUrl: string = "";
+        private currentBeacon?: Peripheral;
     }
 }
