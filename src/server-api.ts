@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import Vorpal from "vorpal";
 import {isURL} from "validator";
 import range from "lodash/range";
-import fetch, { Response as NFResponse } from "node-fetch";
+import fetch, { Response as NFResponse, Request as NFRequest } from "node-fetch";
 import {API} from "../definitions/exp-run";
 import {vorpal_appdata} from "./plugins/vorpal-appdata"
 import {ExpEvents} from "./exp-events";
@@ -156,8 +156,9 @@ export module exp_run {
         }
 
         private setupServerRedirectSetter() {
-            const serverSetter = (url: number | null, cb: () => void) => {
+            const serverSetter = (url: number | null, user: string | null, cb: () => void) => {
                 this.serverRedirect = url;
+                this.serverUser = user;
                 this.requestServerRedirectUpdate(cb);
             };
             const serverIsSet = () => {
@@ -183,10 +184,11 @@ export module exp_run {
                 })
                 .action(function(args, callback) {
                     const num: number = <number>args.number;
-                    const message: string = num ? `${ServerApi.ACTION_DESC_SET_SERVER_REDIRECT}${num}` : ServerApi.ACTION_DESC_SET_SERVER_REDIRECT_EMPTY;
+                    const user: string | null = <string>args.user || null;
+                    const message: string = num ? `${ServerApi.ACTION_DESC_SET_SERVER_REDIRECT}${num}${user ? ' - user:' + user: ''}` : ServerApi.ACTION_DESC_SET_SERVER_REDIRECT_EMPTY;
 
                     this.log(message);
-                    serverSetter(num || null, callback);
+                    serverSetter(num, user, callback);
                 });
         }
 
@@ -204,7 +206,9 @@ export module exp_run {
                 cb();
             };
 
-            const fetchPromise: Promise<NFResponse> = this.serverRedirect ? fetch(`${endpoint}${this.serverRedirect}`) : fetch(endpoint, { method: "DELETE" });
+            const fetchPromise: Promise<NFResponse> = this.serverRedirect ?
+                fetch(this.serverUser ? new NFRequest(`${endpoint}${this.serverRedirect}`, { headers: { user: this.serverUser } }): `${endpoint}${this.serverRedirect}`) :
+                fetch(endpoint, { method: "DELETE" });
 
             fetchPromise.then(resHandler).then(textHandler, errortHandler);
         }
@@ -242,7 +246,7 @@ export module exp_run {
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT: string = "Server redirect endpoint set to: ";
         private static readonly ACTION_DESC_GET_SERVER_REDIRECT_NOT_SET: string = "Server redirect endpoint not set!";
 
-        private static readonly COMMAND_NAME_SET_SERVER_REDIRECT_WITH_ARGS: string = `${ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT} [number]`;
+        private static readonly COMMAND_NAME_SET_SERVER_REDIRECT_WITH_ARGS: string = `${ServerApi.COMMAND_NAME_SET_SERVER_REDIRECT} [number] [user]`;
         private static readonly PATH_FRAGMENT_SET_SERVER_REDIRECT: string = "/setredirect/";
         private static readonly COMMAND_DESC_SET_SERVER_REDIRECT: string = "Sets the server redirect endpoint";
         private static readonly VALID_FAIL_DESC_SET_SERVER_REDIRECT_URL: string = "Cannot set server redirect when server URL not set";
@@ -252,5 +256,6 @@ export module exp_run {
 
         private serverUrl: string = "";
         private serverRedirect: number | null = null;
+        private serverUser: string | null = null;
     }
 }

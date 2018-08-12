@@ -301,6 +301,8 @@ export module exp_run {
                 this.cacheExperimentIndex();
             };
 
+            const userFetchWrapper = () => this.fetchUserOrder();
+
             function selectExperiment(): (commandCb: () => void) => void {
                 function promptInvoker(commandCb: () => void) {
 
@@ -318,7 +320,7 @@ export module exp_run {
                         if (updatedEndpoint !== undefined) {
                             orderIndexAccessor(updatedOrderIdx);
                             updateCachedIndex();
-                            (<(self: Vorpal, args: any, cb: () => void) => void >vcWFn._fn.call)(vI, { number: updatedEndpoint }, noOp);
+                            (<(self: Vorpal, args: any, cb: () => void) => void >vcWFn._fn.call)(vI, { number: updatedEndpoint, user: userFetchWrapper() }, noOp);
                             promptInvoker(commandCb);
                             vI.ui.input("");
                         } else if (selectedOption === MetaApi.OPTION_VAL_RUN_EXP_FINISH) {
@@ -420,7 +422,6 @@ export module exp_run {
             return checkForExitInput;
         }
 
-
         private fetchUserOrder(): number[] | null {
             let userOrder: number[] | null = null;
 
@@ -429,6 +430,16 @@ export module exp_run {
             });
 
             return userOrder;
+        }
+
+        private fetchUser(): string | null {
+            let user: string | null = null;
+
+            this.vorpalInstance.emit(ExpEvents.REQUEST_USER, (nums: string) => {
+                user = nums;
+            });
+
+            return user;
         }
 
         private static readonly STORAGE_KEY_RANGE: string = "range";

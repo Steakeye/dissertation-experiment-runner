@@ -1,6 +1,5 @@
 import EventEmitter from 'events';
 import Vorpal, {CommandInstance} from "vorpal";
-import range from "lodash/range";
 import fsExtra from "fs-extra";
 import Chance from "chance";
 import {isEmail} from "validator";
@@ -37,6 +36,7 @@ export module exp_run {
             this.onRequestSaveUser = this.onRequestSaveUser.bind(this);
 
             vI.on(ExpEvents.EVT_RANGE_SET, this.updateUserNumbersOnRangeUpdate);
+            vI.on(ExpEvents.REQUEST_USER, this.onRequestUser);
             vI.on(ExpEvents.REQUEST_USER_ORDER, this.onRequestUserOrder);
             vI.on(ExpEvents.REQUEST_SAVE_USER, this.onRequestSaveUser);
         }
@@ -200,6 +200,12 @@ export module exp_run {
             if (email) {
                 this.updateUserNumbers(email);
             }
+        }
+
+        private onRequestUser(cb: (user: string | null) => void) : void {
+            const userVal: string = this.userEmail;
+
+            cb(userVal || null);
         }
 
         private onRequestUserOrder(cb: (nums: number[] | null) => void) : void {
