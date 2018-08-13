@@ -32,6 +32,7 @@ export module exp_run {
         private configureEventListeners(): void {
             const vI = this.vorpalInstance;
             this.updateUserNumbersOnRangeUpdate = this.updateUserNumbersOnRangeUpdate.bind(this);
+            this.onRequestUser = this.onRequestUser.bind(this);
             this.onRequestUserOrder = this.onRequestUserOrder.bind(this);
             this.onRequestSaveUser = this.onRequestSaveUser.bind(this);
 

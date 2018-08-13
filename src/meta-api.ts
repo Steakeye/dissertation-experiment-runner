@@ -301,7 +301,7 @@ export module exp_run {
                 this.cacheExperimentIndex();
             };
 
-            const userFetchWrapper = () => this.fetchUserOrder();
+            const userFetchWrapper = () => this.fetchUser();
 
             function selectExperiment(): (commandCb: () => void) => void {
                 function promptInvoker(commandCb: () => void) {
@@ -435,8 +435,8 @@ export module exp_run {
         private fetchUser(): string | null {
             let user: string | null = null;
 
-            this.vorpalInstance.emit(ExpEvents.REQUEST_USER, (nums: string) => {
-                user = nums;
+            this.vorpalInstance.emit(ExpEvents.REQUEST_USER, (userVal: string) => {
+                user = userVal;
             });
 
             return user;
