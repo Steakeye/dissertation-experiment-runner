@@ -1,13 +1,30 @@
 import os from 'os';
 import Vorpal from 'vorpal';
-import NodePersist, {InitOptions} from 'node-persist';
+import NodePersist from 'node-persist';
 import appRoot from 'app-root-path'
 
 export namespace vorpal_appdata {
 
+    export interface VorpalAppdataFSOptions {
+        encoding?: string | null;
+        mode?: number | string;
+        flag?: string;
+    }
+
+    export interface VorpalAppdataInitOptions {
+        dir?: string;
+        stringify?: (toSerialize: any) => string;
+        parse?: (serialized: string) => any;
+        encoding?: VorpalAppdataFSOptions | string;
+        logging?: boolean | Function;
+        continuous?: boolean;
+        interval?: number | boolean;
+        ttl?: number | boolean;
+    }
+
     export interface NodePersistAPI {
-        init(options?: InitOptions, callback?: Function): Q.Promise<any>;
-        initSync(options?: InitOptions): void;
+        init(options?: VorpalAppdataInitOptions, callback?: Function): Q.Promise<any>;
+        initSync(options?: VorpalAppdataInitOptions): void;
         getItem(key: string, callback?: (err: any, value: any) => any): Q.Promise<any>;
         getItemSync(key: string): any;
         setItem(key: string, value: any, callback?: (err: any) => any): Q.Promise<any>;
